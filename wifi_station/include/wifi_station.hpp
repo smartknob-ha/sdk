@@ -1,10 +1,10 @@
 #ifndef WIFI_STA_HPP
 #define WIFI_STA_HPP
 
-class WifiSta {
+class WifiStation {
 
 public:
-    WifiSta ();
+    WifiStation ();
 private:
     static const inline char TAG[] = "Wifi STA";
 
