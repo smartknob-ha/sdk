@@ -1,0 +1,59 @@
+menu "Smartknob-HA Components"
+
+    menu "Wifi Station"
+
+        config STATION_CREDENTIALS_FROM_KCONFIG
+            bool "Station Credentials from KConfig"
+            default false
+            help
+                Select this if the SSID and password should be taken from KConfig
+
+        config STATION_SSID
+            string "STATION SSID"
+            depends on STATION_CREDENTIALS_FROM_KCONFIG
+
+        config STATION_PASSWORD
+            string "STATION Password"
+            depends on STATION_CREDENTIALS_FROM_KCONFIG
+
+        config STATION_MAXIMUM_RETRY
+            int "Max connection retries"
+            default 5
+
+        choice MINIMUM_STATION_SECURITY
+            depends on STATION_CREDENTIALS_FROM_KCONFIG
+            prompt "Station security standard threshold"
+            default ESP_WIFI_AUTH_WPA2_WPA3_PSK
+            help
+                Determine minimum security for WiFi station mode
+                - WiFi Auth OPEN
+                - WiFi Auth WEP
+                - WiFi Auth WPA_PSK
+                - WiFi Auth WPA2_PSK
+                - WiFi Auth WPA_WPA2_PSK
+                - WiFi Auth WPA3_PSK
+                - WiFi Auth WPA2_WPA3_PSK
+                - WiFi Auth WAPI_PSK
+            config ESP_WIFI_AUTH_OPEN
+                bool "Open"
+            config ESP_WIFI_AUTH_WEP
+                bool "WEP"
+            config ESP_WIFI_AUTH_WPA_PSK
+                bool "WPA-PSK"
+            config ESP_WIFI_AUTH_WPA2_PSK
+                bool "WPA2-PSK"
+            config ESP_WIFI_AUTH_WPA_WPA2_PSK
+                bool "WPA/WPA2-PSK"
+            config ESP_WIFI_AUTH_WPA3_PSK
+                bool "WPA3-PSK"
+            config ESP_WIFI_AUTH_WPA2_WPA3_PSK
+                bool "WPA2/3-PSK"
+            config ESP_WIFI_AUTH_WAPI_PSK
+                bool "WAPI-PSK"
+        endchoice
+
+    endmenu
+
+endmenu
+
+#Message #firmware
