@@ -1,0 +1,7 @@
+set(COMPONENT_ADD_INCLUDEDIRS "include")
+set(COMPONENT_SRCDIRS "src")
+
+set(COMPONENT_NAME "Smartknob-HA SDK Manager")
+
+idf_component_register(COMPONENT_SRCDIRS ${COMPONENT_SRCDIRS}
+                    INCLUDE_DIRS ${COMPONENT_ADD_INCLUDEDIRS})
