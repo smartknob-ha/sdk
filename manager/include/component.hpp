@@ -4,6 +4,8 @@
 #include <result.h>
 #include <etl/string.h>
 
+#include "esp_err.h"
+
 /**
  * @brief   This is supposed to be a list of all the components 
  *          used in the SmartKnob-ha SDK. 
@@ -48,7 +50,7 @@ class component {
         /**
          * @brief Gets called by the manager before startup
         */
-        virtual res initialize();
+        virtual res initialize() {  return Ok(ESP_OK);  };
  
         /**
          * @brief Gets called by the manager in its' main loop
@@ -57,7 +59,7 @@ class component {
          *          the component by calling stop(), initialize()
          *          and run().
         */
-        virtual res run();
+        virtual res run() { return Ok(ESP_OK);  };
 
         /**
          * @brief May be called after the component has returned

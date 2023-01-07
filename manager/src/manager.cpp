@@ -1,8 +1,9 @@
 #include "../include/manager.hpp"
 
-#include "esp-log.h"
-
+#include "esp_log.h"
 #include <thread>
+
+namespace sdk {
 
 manager& manager::instance() {
     static manager* self;
@@ -17,7 +18,10 @@ void manager::add_component(component& ref) {
 }
 
 void manager::start() {
-    std::thread(&manager::run, this).detach();
+    if (!m_running) {
+        std::thread(&manager::run, this).detach();
+        m_running = true;
+    }
 }
 
 void manager::run() {
@@ -29,7 +33,7 @@ void manager::run() {
         for (component& c : m_components) {
             auto res = c.run();
             if (res.isErr()) {
-                ESP_LOGW("Component %s reported an error: %s", 
+                ESP_LOGW(TAG, "Component %s reported an error: %s", 
                     c.get_tag().c_str(), res.unwrapErr().c_str());
                 restartComponent(c);
             }
@@ -38,15 +42,19 @@ void manager::run() {
 }
 
 void manager::restartComponent(component& c) {
-    auto res = c.stop();
-    if (res.isErr()) {
-        return ESP_LOGE("Failed to stop component %s: %s", 
-            c.get_tag().c_str(), res.unwrapErr().c_str());
+    auto stop_res = c.stop();
+    if (stop_res.isErr()) {
+        ESP_LOGE(TAG, "Failed to stop component %s: %s", 
+            c.get_tag().c_str(), stop_res.unwrapErr().c_str());
+        return;
     }
 
-    res = c.initialize();
-    if (res.isErr()) {
-        return ESP_LOGE("Failed to re-initialize component %s: %s",
-            c.get_tag().c_str(), res.unwrapErr().c_str());
+    auto init_res = c.initialize();
+    if (init_res.isErr()) {
+        ESP_LOGE(TAG, "Failed to re-initialize component %s: %s",
+            c.get_tag().c_str(), init_res.unwrapErr().c_str());
+        return;
     }
 }
+
+} /* namespace sdk */
