@@ -41,6 +41,11 @@ class manager {
          * @brief   Starts a thread on the run function
         */
         void start();
+
+        /**
+         * @brief   Stops the managers' thread
+        */
+        void stop();
     private:
         static const inline char TAG[] = "Manager";
 

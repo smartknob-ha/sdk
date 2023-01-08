@@ -19,9 +19,14 @@ void manager::add_component(component& ref) {
 
 void manager::start() {
     if (!m_running) {
-        std::thread(&manager::run, this).detach();
         m_running = true;
+        auto t = std::thread(&manager::run, this);
+        t.detach();
     }
+}
+
+void manager::stop() {
+    m_running = false;
 }
 
 void manager::run() {
@@ -37,7 +42,7 @@ void manager::run() {
         }
     }
 
-    while (true) {
+    while (m_running) {
         for (auto& entry : m_components) {
             if (entry.first) {
                 component& c = entry.second; 
