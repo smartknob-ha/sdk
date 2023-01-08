@@ -54,7 +54,9 @@ class manager {
          * and non-copyable
         */
         manager(void) {};
-        manager(manager& other) {};
+        manager(manager& other) = delete;
+        manager& operator=(const manager&) = delete;
+        manager& operator=(manager&) = delete;
 
         /**
          * @brief   Infinitely running function, intended
@@ -64,13 +66,18 @@ class manager {
         void run();
 
         /**
+         * @brief   Used to couple non-static member function run()
+         *          to function pointer for use in FreeRTOS task
+        */
+        static void start_run(void*);
+
+        /**
          * @brief   restartComponent will attempt to restart
          *          a component after its' run() function  
          *          has reported a direct error
         */
         void restartComponent(etl::pair<bool, std::reference_wrapper<component>>& entry);
 
-        messages m_messages{};
         bool m_running = false;
         etl::vector<etl::pair<bool, std::reference_wrapper<component>>, NUM_COMPONENTS> m_components;
 };

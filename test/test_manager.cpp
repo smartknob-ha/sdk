@@ -1,4 +1,8 @@
 #include "unity.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "../../manager/include/manager.hpp"
 #include "../../mock_component/include/mock_component.hpp"
 
@@ -16,7 +20,7 @@ void test_instance_should_always_return_same_reference() {
     sdk::manager& ref_first = sdk::manager::instance();
     sdk::manager& ref_second = sdk::manager::instance();
 
-    TEST_ASSERT_TRUE(&ref_first==&ref_second);
+    TEST_ASSERT_TRUE(&ref_first == &ref_second);
 }
 
 void test_added_component_should_be_initialized_and_ran() {
@@ -26,6 +30,8 @@ void test_added_component_should_be_initialized_and_ran() {
     m.add_component(test_component);
 
     m.start();
+
+    usleep(200);
 
     TEST_ASSERT_TRUE(test_component.initialize_called());
     TEST_ASSERT_TRUE(test_component.run_called());
@@ -56,7 +62,7 @@ void test_component_should_be_restarted_after_run_error() {
         .called = false
     });
 
-    usleep(50);
+    usleep(200);
 
     TEST_ASSERT_TRUE(test_component.initialize_called());
     TEST_ASSERT_TRUE(test_component.run_called());
@@ -91,7 +97,7 @@ void test_component_should_be_disabled_after_stop_error() {
         .called = false
     });
 
-    usleep(50);
+    usleep(200);
 
     TEST_ASSERT_FALSE(test_component.run_called());
 }
@@ -142,7 +148,7 @@ void test_component_should_be_disabled_after_initialize_error_in_restart() {
         .called = false
     });
 
-    usleep(50);
+    usleep(200);
 
     TEST_ASSERT_FALSE(test_component.run_called());
 }

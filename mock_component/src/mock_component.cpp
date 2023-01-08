@@ -5,6 +5,8 @@ namespace sdk {
 using res = Result<esp_err_t, etl::string<128>>;
 
 res mock_component::get_status() {
+    m_status_return.called = true;
+
     if (m_status_return.status) {
         return Err(m_status_return.message);
     }
@@ -13,6 +15,8 @@ res mock_component::get_status() {
 }
 
 res mock_component::initialize() {
+    m_initialize_return.called = true;
+
     if (m_initialize_return.status) {
         return Err(m_initialize_return.message);
     }
@@ -21,6 +25,8 @@ res mock_component::initialize() {
 }
 
 res mock_component::run() {
+    m_run_return.called = true;
+
     if (m_run_return.status) {
         return Err(m_initialize_return.message);
     }
@@ -29,6 +35,8 @@ res mock_component::run() {
 }
 
 res mock_component::stop() {
+    m_stop_return.called = true;
+
     if (m_stop_return.status) {
         return Err(m_stop_return.message);
     }

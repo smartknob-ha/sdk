@@ -1,7 +1,9 @@
 #include "../include/manager.hpp"
 
 #include "esp_log.h"
-#include <thread>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 namespace sdk {
 
@@ -20,9 +22,13 @@ void manager::add_component(component& ref) {
 void manager::start() {
     if (!m_running) {
         m_running = true;
-        auto t = std::thread(&manager::run, this);
-        t.detach();
+        xTaskCreate(start_run, "manager", 4096, this, 0, NULL);
     }
+}
+
+void manager::start_run(void* _this) {
+    manager* m = (manager*) (_this);
+    m->run();
 }
 
 void manager::stop() {
@@ -30,6 +36,7 @@ void manager::stop() {
 }
 
 void manager::run() {
+    printf("\nHello!\n");
     for (auto& entry : m_components) {
         auto& c = entry.second.get();
         auto res = c.initialize();
@@ -55,6 +62,7 @@ void manager::run() {
             }
         }
     }
+    vTaskDelete(NULL);
 }
 
 void manager::restartComponent(etl::pair<bool, std::reference_wrapper<component>>& entry) {
