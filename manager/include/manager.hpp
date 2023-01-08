@@ -31,9 +31,9 @@ class manager {
         static manager& instance();
 
         /**
-         * @brief   Use this to add a component to the runtime
-         * @note    If your component can handle it, its' safe
-         *          to add it after the runtime has started
+         * @brief   Use this to add a component to the manager
+         * @note    The order in which components are added
+         *          determines in what order they will be ran
         */
         void add_component(component& ref);
 
@@ -59,15 +59,15 @@ class manager {
         void run();
 
         /**
-         * @brief   This function will attempt to restart
+         * @brief   restartComponent will attempt to restart
          *          a component after its' run() function  
          *          has reported a direct error
         */
-        void restartComponent(component& c);
+        void restartComponent(etl::pair<bool, std::reference_wrapper<component>>& entry);
 
         messages m_messages{};
         bool m_running = false;
-        etl::vector<std::reference_wrapper<component>, NUM_COMPONENTS> m_components;
+        etl::vector<etl::pair<bool, std::reference_wrapper<component>>, NUM_COMPONENTS> m_components;
 };
 
 } /* namespace sdk */
