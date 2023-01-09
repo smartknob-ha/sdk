@@ -39,6 +39,8 @@ class mock_component : public component {
         bool run_called() { return m_run_return.called; };
         bool stop_called() { return m_stop_return.called; };
 
+        void reset();
+
     private:
         static const inline char TAG[] = "mock_result component";
 

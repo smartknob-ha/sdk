@@ -44,4 +44,11 @@ res mock_component::stop() {
     return Ok(m_stop_return.status);
 }
 
+void mock_component::reset() {
+    m_status_return = { .status = ESP_OK, .message = "", .called = false };
+    m_initialize_return = { .status = ESP_OK, .message = "", .called = false };
+    m_run_return = { .status = ESP_OK, .message = "", .called = false };
+    m_stop_return = { .status = ESP_OK, .message = "", .called = false };
+}
+
 } /* namespace sdk */

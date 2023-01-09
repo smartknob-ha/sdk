@@ -15,17 +15,6 @@
 
 namespace sdk {
 
-enum MESSAGE_TYPES {
-    STATUS,
-    DATA
-};
-
-struct status_message : public etl::message<MESSAGE_TYPES::STATUS> {
-    Result<COMPONENT_STATUS, etl::string<128>> result;
-};
-
-typedef etl::message_packet<status_message> message_packet;
-
 class manager {
     public:
         static manager& instance();

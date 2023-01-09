@@ -16,13 +16,14 @@ manager& manager::instance() {
 }
 
 void manager::add_component(component& ref) {
+    assert(!m_components.full());
     m_components.emplace_back(etl::pair{false, std::reference_wrapper<component>(ref)});
 }
 
 void manager::start() {
     if (!m_running) {
         m_running = true;
-        xTaskCreate(start_run, "manager", 4096, this, 0, NULL);
+        xTaskCreate(start_run, "manager", 4096, this, 1, NULL);
     }
 }
 
@@ -36,7 +37,8 @@ void manager::stop() {
 }
 
 void manager::run() {
-    printf("\nHello!\n");
+    ESP_LOGD(TAG, "Starting manager::run()");
+
     for (auto& entry : m_components) {
         auto& c = entry.second.get();
         auto res = c.initialize();
@@ -45,6 +47,7 @@ void manager::run() {
                 c.get_tag().c_str(), res.unwrapErr().c_str());
             entry.first = false;
         } else {
+            ESP_LOGD(TAG, "Initialized component: %s", c.get_tag().c_str());
             entry.first = true;
         }
     }
@@ -61,6 +64,9 @@ void manager::run() {
                 }
             }
         }
+
+        // Prevent watchdog trigger
+        vTaskDelay(1);
     }
     vTaskDelete(NULL);
 }
@@ -81,6 +87,7 @@ void manager::restartComponent(etl::pair<bool, std::reference_wrapper<component>
         ESP_LOGE(TAG, "Failed to re-initialize component %s: %s",
             c.get_tag().c_str(), init_res.unwrapErr().c_str());
         entry.first = false;
+        c.stop();
         return;
     }
 

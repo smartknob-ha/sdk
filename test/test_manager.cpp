@@ -6,14 +6,19 @@
 #include "../../manager/include/manager.hpp"
 #include "../../mock_component/include/mock_component.hpp"
 
+sdk::manager& m = sdk::manager::instance();
+sdk::mock_component test_component;
+
 // Repeated for each test
 void setUp() {
-    
+    m.start();
 }
 
 // Repeated after each test
 void tearDown() {
     sdk::manager::instance().stop();
+    usleep(200);
+    test_component.reset();
 }
 
 void test_instance_should_always_return_same_reference() {
@@ -24,13 +29,6 @@ void test_instance_should_always_return_same_reference() {
 }
 
 void test_added_component_should_be_initialized_and_ran() {
-    sdk::manager& m = sdk::manager::instance();
-    sdk::mock_component test_component;
-
-    m.add_component(test_component);
-
-    m.start();
-
     usleep(200);
 
     TEST_ASSERT_TRUE(test_component.initialize_called());
@@ -38,13 +36,6 @@ void test_added_component_should_be_initialized_and_ran() {
 }
 
 void test_component_should_be_restarted_after_run_error() {
-    sdk::manager& m = sdk::manager::instance();
-    sdk::mock_component test_component;
-
-    m.add_component(test_component);
-
-    m.start();
-
     // Make sure thread is running
     while (!test_component.initialize_called()) {};
     while (!test_component.run_called()) {};
@@ -62,19 +53,23 @@ void test_component_should_be_restarted_after_run_error() {
         .called = false
     });
 
-    usleep(200);
+    sleep(1);
 
-    TEST_ASSERT_TRUE(test_component.initialize_called());
-    TEST_ASSERT_TRUE(test_component.run_called());
+    while (!test_component.run_called()) {}
+
+    test_component.set_run_return({
+        .status = ESP_OK,
+        .message = "", 
+        .called = false
+    });
+
+    sleep(1);
+
+    TEST_ASSERT_TRUE_MESSAGE(test_component.initialize_called(), "initialize not called");
+    TEST_ASSERT_TRUE_MESSAGE(test_component.run_called(), "run not called");
 }
 
 void test_component_should_be_disabled_after_stop_error() {
-    sdk::manager& m = sdk::manager::instance();
-    sdk::mock_component test_component;
-
-    m.add_component(test_component);
-    m.start();
-
     // Trigger call to restartComponent
     test_component.set_run_return({
         .status = ESP_ERR_INVALID_STATE,
@@ -99,14 +94,13 @@ void test_component_should_be_disabled_after_stop_error() {
 
     usleep(200);
 
-    TEST_ASSERT_FALSE(test_component.run_called());
+    TEST_ASSERT_FALSE_MESSAGE(test_component.run_called(), "didn't expect run to get called");
 }
 
 void test_component_should_be_disabled_after_initialize_error() {
-    sdk::manager& m = sdk::manager::instance();
-    sdk::mock_component test_component;
-    m.add_component(test_component);
-
+    m.stop();
+    sleep(1);
+    
     test_component.set_initialize_return({
         .status = ESP_ERR_INVALID_STATE,
         .message = "forced error",
@@ -114,18 +108,12 @@ void test_component_should_be_disabled_after_initialize_error() {
     });
 
     m.start();
-    usleep(50);
+    sleep(1);
 
-    TEST_ASSERT_FALSE(test_component.run_called());    
+    TEST_ASSERT_FALSE(test_component.run_called());
 }
 
 void test_component_should_be_disabled_after_initialize_error_in_restart() {
-    sdk::manager& m = sdk::manager::instance();
-    sdk::mock_component test_component;
-
-    m.add_component(test_component);
-    m.start();
-
     // Trigger call to restartComponent
     test_component.set_run_return({
         .status = ESP_ERR_INVALID_STATE,
@@ -148,7 +136,7 @@ void test_component_should_be_disabled_after_initialize_error_in_restart() {
         .called = false
     });
 
-    usleep(200);
+    sleep(1);
 
     TEST_ASSERT_FALSE(test_component.run_called());
 }
@@ -156,6 +144,8 @@ void test_component_should_be_disabled_after_initialize_error_in_restart() {
 extern "C" {
 
 int app_main(void) {
+    m.add_component(test_component);
+
     UNITY_BEGIN();
 
     RUN_TEST(test_instance_should_always_return_same_reference);
