@@ -70,7 +70,7 @@ void test_component_should_be_restarted_after_run_error() {
 }
 
 void test_component_should_be_disabled_after_stop_error() {
-    // Trigger call to restartComponent
+    // Trigger call to restart_component
     test_component.set_run_return({
         .status = ESP_ERR_INVALID_STATE,
         .message = "forced error", 
@@ -83,7 +83,7 @@ void test_component_should_be_disabled_after_stop_error() {
         .called = false
     });
 
-    // Make sure we're inside restartComponent() and reset run status
+    // Make sure we're inside restart_component() and reset run status
     while (!test_component.stop_called()) {}
 
     test_component.set_run_return({
@@ -114,7 +114,7 @@ void test_component_should_be_disabled_after_initialize_error() {
 }
 
 void test_component_should_be_disabled_after_initialize_error_in_restart() {
-    // Trigger call to restartComponent
+    // Trigger call to restart_component
     test_component.set_run_return({
         .status = ESP_ERR_INVALID_STATE,
         .message = "forced error", 
@@ -127,7 +127,7 @@ void test_component_should_be_disabled_after_initialize_error_in_restart() {
         .called = false
     });
 
-    // Make sure we're inside restartComponent() and reset run status
+    // Make sure we're inside restart_component() and reset run status
     while (!test_component.stop_called()) {}
 
     test_component.set_run_return({
