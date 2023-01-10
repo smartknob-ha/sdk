@@ -1,0 +1,13 @@
+menu "Smartknob-HA Components"
+
+    menu "Display"
+        config DISPLAY_FRAME_BUFFER_PSRAM
+            bool "Should the frame buffer be in PSRAM"
+
+        config LVGL_TICK_RATE
+            int "How often should the timer run in ms"
+            default 1
+
+    endmenu
+
+endmenu
