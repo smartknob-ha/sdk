@@ -63,7 +63,7 @@ class component {
 
         /**
          * @brief May be called after the component has returned
-         *        an error status, or when it's shutting down
+         *        an error status, or when knob is shutting down
         */
         virtual res stop() = 0;
 };

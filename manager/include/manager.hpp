@@ -10,9 +10,6 @@
 
 #include "../../messages/include/messages.h"
 
-// TODO: turn this into a Kconfig option?
-#define NUM_COMPONENTS 4
-
 namespace sdk {
 
 class manager {
@@ -60,15 +57,17 @@ class manager {
         */
         static void start_run(void*);
 
+        using c_entry = etl::pair<bool, std::reference_wrapper<component>>;
+
         /**
-         * @brief   restartComponent will attempt to restart
+         * @brief   restart_component will attempt to restart
          *          a component after its' run() function  
          *          has reported a direct error
         */
-        void restartComponent(etl::pair<bool, std::reference_wrapper<component>>& entry);
+        void restart_component(c_entry& entry);
 
         bool m_running = false;
-        etl::vector<etl::pair<bool, std::reference_wrapper<component>>, NUM_COMPONENTS> m_components;
+        etl::vector<c_entry, CONFIG_NUM_COMPONENTS> m_components;
 };
 
 } /* namespace sdk */

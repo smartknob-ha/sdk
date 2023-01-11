@@ -60,7 +60,7 @@ void manager::run() {
                 if (res.isErr()) {
                     ESP_LOGW(TAG, "Component %s reported an error: %s", 
                         c.get_tag().c_str(), res.unwrapErr().c_str());
-                    restartComponent(entry);
+                    restart_component(entry);
                 }
             }
         }
@@ -71,7 +71,7 @@ void manager::run() {
     vTaskDelete(NULL);
 }
 
-void manager::restartComponent(etl::pair<bool, std::reference_wrapper<component>>& entry) {
+void manager::restart_component(c_entry& entry) {
     component& c = entry.second.get();
 
     auto stop_res = c.stop();
