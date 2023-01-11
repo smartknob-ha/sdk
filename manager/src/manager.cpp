@@ -68,6 +68,15 @@ void manager::run() {
         // Prevent watchdog trigger
         vTaskDelay(1);
     }
+
+    for (auto& entry : m_components) {
+        auto res = entry.second.get().stop();
+        if (res.isErr()) {
+            ESP_LOGE(TAG, "Failed to stop component %s on shutdown of manager", 
+                entry.second.get().get_tag().c_str());
+        }
+    }
+
     vTaskDelete(NULL);
 }
 
