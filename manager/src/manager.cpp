@@ -61,6 +61,8 @@ void manager::run() {
                     ESP_LOGW(TAG, "Component %s reported an error: %s", 
                         c.get_tag().c_str(), res.unwrapErr().c_str());
                     restart_component(entry);
+                } else if (res.unwrap() == COMPONENT_STATUS::DEINITIALIZED) {
+                        entry.first = false;
                 }
             }
         }

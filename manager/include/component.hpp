@@ -25,9 +25,10 @@ typedef enum {
     RUNNING,
     STOPPING,
     STOPPED,
-    ERROR,
-    FATAL
+    DEINITIALIZED
 } COMPONENT_STATUS;
+
+typedef Result<COMPONENT_STATUS, etl::string<128>> res;
 
 /**
  * @brief   Base class for all components created in the
@@ -35,8 +36,6 @@ typedef enum {
 */
 class component {
     public:
-        using res = Result<esp_err_t, etl::string<128>>;
-
         /***
          * @brief Returns name of the component, for use in logging
         */
@@ -50,7 +49,7 @@ class component {
         /**
          * @brief Gets called by the manager before startup
         */
-        virtual res initialize() {  return Ok(ESP_OK);  };
+        virtual res initialize() {  return Ok(UNINITIALIZED);  };
  
         /**
          * @brief Gets called by the manager in its' main loop
@@ -59,7 +58,7 @@ class component {
          *          the component by calling stop(), initialize()
          *          and run().
         */
-        virtual res run() { return Ok(ESP_OK);  };
+        virtual res run() { return Ok(UNINITIALIZED);  };
 
         /**
          * @brief May be called after the component has returned
