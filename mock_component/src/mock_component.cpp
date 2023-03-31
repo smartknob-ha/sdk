@@ -2,8 +2,6 @@
 
 namespace sdk {
 
-using res = Result<esp_err_t, etl::string<128>>;
-
 res mock_component::get_status() {
     m_status_return.called = true;
 
@@ -45,10 +43,10 @@ res mock_component::stop() {
 }
 
 void mock_component::reset() {
-    m_status_return = { .status = ESP_OK, .message = "", .called = false };
-    m_initialize_return = { .status = ESP_OK, .message = "", .called = false };
-    m_run_return = { .status = ESP_OK, .message = "", .called = false };
-    m_stop_return = { .status = ESP_OK, .message = "", .called = false };
+    m_status_return = { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
+    m_initialize_return = { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
+    m_run_return = { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
+    m_stop_return = { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
 }
 
 } /* namespace sdk */
