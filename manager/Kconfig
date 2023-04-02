@@ -8,5 +8,4 @@ menu "Smartknob-HA Components"
             help
                 You should probably not touch this unless you've added a component
     endmenu
-    rsource "../led_strip/config"
 endmenu
