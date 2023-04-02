@@ -1,25 +1,37 @@
-#include "../include/led_strip.hpp"
+#include "led_strip.hpp"
 
 namespace sdk {
 
-using res = Result<esp_err_t, etl::string<128>>;
-
-res led_strip::get_status() {
-    if (m_status != ESP_OK) {
-        return Err(m_status);
-    }
-
+res ring_lights::get_status() {
     return Ok(m_status);
 }
 
-template<class led_type>
-res led_strip::initialize() {
-    FastLED.addLeds<led_type, DATA_PIN, RGB>(m_leds, NUM_LEDS);
-    FastLED.clearLeds(NUM_LEDS);
+res ring_lights::initialize() {
+    led_strip_install();
+    return Ok(INITIALIZING);
 }
 
-res led_strip::run() {
-    FastLED.showLeds();
+res ring_lights::run() {
+
+    static const rgb_t m_colors[] = {
+    { .r = 0x0f, .g = 0x0f, .b = 0x0f },
+    { .r = 0x00, .g = 0x00, .b = 0x2f },
+    { .r = 0x00, .g = 0x2f, .b = 0x00 },
+    { .r = 0x2f, .g = 0x00, .b = 0x00 },
+    { .r = 0x00, .g = 0x00, .b = 0x00 },
+};
+
+    esp_err_t err = led_strip_fill(&m_strip, 0, NUM_LEDS, m_colors[m_color_i]);
+    if (err) {
+        return Err("Failed to set led strip buffer to color");
+    }
+
+    err = led_strip_flush(&m_strip);
+    if (err) {
+        Err("Failed to flush led strip with buffer");
+    }
+
+    m_color_i++;
 }
 
 } /* namespace sdk */
