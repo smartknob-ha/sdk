@@ -1,76 +1,127 @@
 #include "wifi_ap.hpp"
-#include "esp_log.h"
+
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_mac.h"
 #include "esp_wifi.h"
-#include "config.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
 
-void WifiAP::wifi_event_handler(void *arg, esp_event_base_t event_base,
-                                int32_t event_id, void *event_data)
+#include "lwip/err.h"
+#include "lwip/sys.h"
+
+namespace sdk
 {
-    if (event_id == WIFI_EVENT_AP_STACONNECTED)
+    wifi_ap::wifi_ap(wifi_ap_config_t config)
     {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
-        ESP_LOGI(TAG, "station " MACSTR " join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+        m_config = config;
     }
-    else if (event_id == WIFI_EVENT_AP_STADISCONNECTED)
+
+    res wifi_ap::get_status()
     {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
-        ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+        return Ok(RUNNING);
     }
-}
 
-esp_err_t WifiAP::initialize_ap()
-{
-    // Don't care about return value as it either initializes, or it's already initialized
-    esp_netif_init();
+    res wifi_ap::run()
+    {
+        return Ok(RUNNING);
+    }
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *wifi_netif = esp_netif_create_default_wifi_ap();
+    res wifi_ap::stop()
+    {
+        wifi_mode_t current_mode = WIFI_MODE_NULL;
+        esp_err_t err = esp_wifi_get_mode(&current_mode);
+        if(err == ESP_ERR_WIFI_NOT_INIT)
+            ESP_LOGW(TAG, "Wifi is not running, returning");
+        else if(err == ESP_OK && current_mode == WIFI_MODE_AP) {
+            RES_RETURN_ON_ERROR(esp_wifi_stop());
+            m_wifi_initialized = false;
+        }
+        else if(err == ESP_OK && current_mode == WIFI_MODE_APSTA)
+            RES_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA));
+        return Ok(STOPPED);
+    }
 
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    res wifi_ap::initialize()
+    {
+        wifi_mode_t current_mode = WIFI_MODE_NULL, new_mode = WIFI_MODE_AP;
+        esp_err_t err = esp_wifi_get_mode(&current_mode);
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &wifi_event_handler,
-                                                        NULL,
-                                                        NULL));
-#ifdef CONFIG_AP_CREDENTIALS_FROM_KCONFIG
-    wifi_config_t wifi_config = {
-        .ap = {
-            .ssid = CONFIG_AP_SSID,
-            .password = CONFIG_AP_PASSWORD,
-            .ssid_len = strlen(CONFIG_AP_SSID),
-            .channel = CONFIG_AP_CHANNEL,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK,
-            .max_connection = CONFIG_AP_MAX_CONNECTIONS}
-    };
-#else
-    wifi_config_t wifi_config = {
-        .ap = {
-            // .ssid = reinterpret_cast<uint8_t>(&ap_ssid[0]),
-            // .password = reinterpret_cast<uint8_t>(ap_ssid.c_str()),
-            // .ssid_len = ap_ssid.length(),
-            .channel = CONFIG_AP_CHANNEL,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK,
-            .max_connection = CONFIG_AP_MAX_CONNECTIONS}
-    };
-    // std copy to avoid casting errors
-    std::copy(ap_ssid.begin(), ap_ssid.end(), std::begin(wifi_config.ap.ssid));
-    std::copy(ap_pass.begin(), ap_pass.end(), std::begin(wifi_config.ap.password));
+        if (err == ESP_OK && current_mode == WIFI_MODE_AP)
+        {
+            m_wifi_initialized = true;
+            return Err(etl::string<128>("Soft AP is already initialized, returning"));
+        }
+        else if (err == ESP_OK && current_mode == WIFI_MODE_STA)
+        {
+            ESP_LOGW(TAG, "Wifi already initialized as STA, attempting to add Soft AP");
+            new_mode = WIFI_MODE_APSTA;
+            m_wifi_initialized = true;
+        }
 
-#endif
+        if (!m_wifi_initialized)
+        {
+            // Don't care about return value as it either initializes, or it's already initialized
+            esp_netif_init();
+            RES_RETURN_ON_ERROR(esp_event_loop_create_default());
+            wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+            RES_RETURN_ON_ERROR(esp_wifi_init(&cfg));
+        }
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+        m_esp_netif = esp_netif_create_default_wifi_ap();
 
-    ESP_LOGI(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
-    return ESP_OK;
-}
+        RES_RETURN_ON_ERROR(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &ap_event_handler, NULL, NULL));
 
-WifiAP::WifiAP(std::string ssid, std::string password) {
-    ap_ssid = ssid;
-    ap_pass = password;
-}
+        wifi_config_t wifi_config = {
+            .ap = {
+                .ssid_len = (uint8_t)sizeof(m_config.ssid),
+                .channel = m_config.channel,
+                .authmode = m_config.authmode,
+                .max_connection = CONFIG_AP_MAX_CONNECTIONS}};
+        // std copy to avoid casting errors
+        memcpy(wifi_config.ap.ssid, m_config.ssid.data(), sizeof(m_config.ssid));
+        memcpy(wifi_config.ap.password, m_config.pass.data(), sizeof(m_config.pass));
+
+        RES_RETURN_ON_ERROR(esp_wifi_set_mode(new_mode));
+        RES_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
+        RES_RETURN_ON_ERROR(esp_wifi_start());
+
+        ESP_LOGI(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
+        return Ok(RUNNING);
+    }
+
+    void wifi_ap::ap_event_handler(void *arg, esp_event_base_t event_base,
+                                   int32_t event_id, void *event_data)
+    {
+        switch (event_id)
+        {
+        case WIFI_EVENT_AP_START: {
+            ESP_LOGI(TAG, "AP has started");
+            break;
+        }
+        case WIFI_EVENT_AP_STOP: {
+            ESP_LOGI(TAG, "AP has stopped");
+            break;
+        }
+        case WIFI_EVENT_AP_STACONNECTED: {
+            ESP_LOGI(TAG, "A client has connected");
+            break;
+        }
+        case WIFI_EVENT_AP_STADISCONNECTED: {
+            ESP_LOGI(TAG, "A client has disconected");
+            break;
+        }
+        case WIFI_EVENT_AP_PROBEREQRECVED: {
+            ESP_LOGI(TAG, "There's some sus probing happening right now");
+            break;
+        }
+        case WIFI_EVENT_MAX: {
+            ESP_LOGE(TAG, "Perhaps the archives were incomplete, %ld", event_id);
+            break;
+        }
+        }
+    }
+
+} /* namespace sdk */
