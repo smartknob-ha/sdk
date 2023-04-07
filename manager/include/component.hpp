@@ -29,6 +29,7 @@ typedef enum {
 } COMPONENT_STATUS;
 
 typedef Result<COMPONENT_STATUS, etl::string<128>> res;
+#define ERR(err_msg, esp_err) Err(etl::string<128>(etl::string<128>(err_msg).substr(0, 104).append(esp_err_to_name(esp_err))))
 
 /**
  * @brief   Base class for all components created in the
