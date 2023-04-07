@@ -1,0 +1,8 @@
+menu "Manager"
+
+    config NUM_COMPONENTS
+        int "Number of components in use from the SDK"
+        default 1
+        help
+            You should probably not touch this unless you've added a component
+endmenu
