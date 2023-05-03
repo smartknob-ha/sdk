@@ -50,15 +50,12 @@ typedef Result<COMPONENT_STATUS, etl::string<128>> res;
         return Err(etl::string<128>(esp_err_to_name(esp_err)));                                                     \
     } while (0)
 
-#define MAX_ENQUEUE_WAIT_TICKS 0
-
-
-template<UBaseType_t LEN, typename QUEUETYPE>
+template<UBaseType_t LEN, typename QUEUETYPE, TickType_t ENQUEUE_TIMEOUT>
 class has_queue {
     public:
         has_queue() : m_queue(xQueueCreateStatic(LEN, sizeof(QUEUETYPE), m_queue_storage, &m_queue_data)) {};
 
-        void enqueue(QUEUETYPE& item) { xQueueSend(m_queue, (void*) &item, 0); }
+        void enqueue(QUEUETYPE& item) { xQueueSend(m_queue, (void*) &item, ENQUEUE_TIMEOUT); }
 
         ~has_queue() {
             vQueueUnregisterQueue(m_queue);
