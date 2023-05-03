@@ -1,20 +1,27 @@
 #ifndef MOCK_COMPONENT_HPP
 #define MOCK_COMPONENT_HPP
 
-#include "../../manager/include/component.hpp"
+#include "component.hpp"
+
+#include <etl/message_router.h>
+#include <etl/message_router_registry.h>
 
 namespace sdk {
+
+struct mock_message {
+    uint32_t data;
+};
 
 /***
  * @brief   This class can be used to test the component manager
 */
-class mock_component : public component {
+class mock_component : public component, public has_queue<10, mock_message> {
     public:
         mock_component() {};
         ~mock_component() = default;
 
         struct mock_result {
-            COMPONENT_STATUS status;
+            bool ok;
             etl::string<128> message;
             bool called;
         };
@@ -42,10 +49,10 @@ class mock_component : public component {
     private:
         static const inline char TAG[] = "mock_result component";
 
-        mock_result m_status_return { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
-        mock_result m_initialize_return { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
-        mock_result m_run_return { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
-        mock_result m_stop_return { .status = COMPONENT_STATUS::UNINITIALIZED, .message = "", .called = false };
+        mock_result m_status_return { .ok = true, .message = "", .called = false };
+        mock_result m_initialize_return { .ok = true, .message = "", .called = false };
+        mock_result m_run_return { .ok = true, .message = "", .called = false };
+        mock_result m_stop_return { .ok = true, .message = "", .called = false };
 };
 
 } /* namespace sdk */

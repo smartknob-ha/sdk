@@ -1,14 +1,15 @@
 #ifndef COMPONENTS_HPP
 #define COMPONENTS_HPP
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include <result.h>
 #include <etl/string.h>
-
 #include "esp_err.h"
 
 /**
- * @brief   This is supposed to be a list of all the components 
- *          used in the SmartKnob-ha SDK. 
+ * @brief   This is supposed to be a list of all the components
+ *          used in the SmartKnob-ha SDK.
  * @details When adding a component, add it between the last
  *          component and the MAX element.
  **/
@@ -49,6 +50,24 @@ typedef Result<COMPONENT_STATUS, etl::string<128>> res;
         return Err(etl::string<128>(esp_err_to_name(esp_err)));                                                     \
     } while (0)
 
+template<UBaseType_t LEN, typename QUEUETYPE, TickType_t ENQUEUE_TIMEOUT>
+class has_queue {
+    public:
+        has_queue() : m_queue(xQueueCreateStatic(LEN, sizeof(QUEUETYPE), m_queue_storage, &m_queue_data)) {};
+
+        void enqueue(QUEUETYPE& item) { xQueueSend(m_queue, (void*) &item, ENQUEUE_TIMEOUT); }
+
+        ~has_queue() {
+            vQueueUnregisterQueue(m_queue);
+        }
+    protected:
+        QueueHandle_t m_queue;
+
+    private:
+        uint8_t m_queue_storage [ LEN * sizeof(QUEUETYPE) ];
+        StaticQueue_t m_queue_data;
+};
+
 /**
  * @brief   Base class for all components created in the
  *          SmartKnob-HA SDK
@@ -69,7 +88,7 @@ class component {
          * @brief Gets called by the manager before startup
         */
         virtual res initialize() {  return Ok(UNINITIALIZED);  };
- 
+
         /**
          * @brief Gets called by the manager in its' main loop
          * @note  Any error message returned will be treated
