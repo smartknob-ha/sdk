@@ -15,7 +15,7 @@ struct mock_message {
 /***
  * @brief   This class can be used to test the component manager
 */
-class mock_component : public component, public has_queue<10, mock_message> {
+class mock_component : public component, public has_queue<10, mock_message, 0> {
     public:
         mock_component() {};
         ~mock_component() = default;
