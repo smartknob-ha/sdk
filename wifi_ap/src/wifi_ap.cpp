@@ -12,13 +12,11 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include <etl/type_traits.h>
+#include <etl/container.h>
+
 namespace sdk
 {
-    wifi_ap::wifi_ap(wifi_ap_config_t config)
-    {
-        m_config = config;
-    }
-
     res wifi_ap::get_status()
     {
         return Ok(RUNNING);
@@ -36,16 +34,16 @@ namespace sdk
         if(err == ESP_ERR_WIFI_NOT_INIT)
             ESP_LOGW(TAG, "Wifi is not running, returning");
         else if(err == ESP_OK && current_mode == WIFI_MODE_AP) {
-            RES_RETURN_ON_ERROR(esp_wifi_stop());
-            m_wifi_initialized = false;
+            RETURN_ERR_MSG(esp_wifi_stop(), "esp_wifi_stop: ");
         }
         else if(err == ESP_OK && current_mode == WIFI_MODE_APSTA)
-            RES_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA));
+            RETURN_ERR_MSG(esp_wifi_set_mode(WIFI_MODE_STA), "esp_wifi_set_mode: ");
         return Ok(STOPPED);
     }
 
     res wifi_ap::initialize()
     {
+        vTaskDelay(9000 / portTICK_PERIOD_MS);
         wifi_mode_t current_mode = WIFI_MODE_NULL, new_mode = WIFI_MODE_AP;
         esp_err_t err = esp_wifi_get_mode(&current_mode);
 
@@ -65,30 +63,38 @@ namespace sdk
         {
             // Don't care about return value as it either initializes, or it's already initialized
             esp_netif_init();
-            RES_RETURN_ON_ERROR(esp_event_loop_create_default());
+            RETURN_ERR_MSG(esp_event_loop_create_default(), "esp_event_loop_create_default: ");
             wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-            RES_RETURN_ON_ERROR(esp_wifi_init(&cfg));
+            RETURN_ERR_MSG(esp_wifi_init(&cfg), "esp_wifi_init: ");
         }
 
         m_esp_netif = esp_netif_create_default_wifi_ap();
 
-        RES_RETURN_ON_ERROR(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &ap_event_handler, NULL, NULL));
+        RETURN_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &ap_event_handler, NULL, NULL), "esp_event_handler_instance_register: ");
 
         wifi_config_t wifi_config = {
             .ap = {
-                .ssid_len = (uint8_t)sizeof(m_config.ssid),
                 .channel = m_config.channel,
                 .authmode = m_config.authmode,
-                .max_connection = CONFIG_AP_MAX_CONNECTIONS}};
-        // std copy to avoid casting errors
-        memcpy(wifi_config.ap.ssid, m_config.ssid.data(), sizeof(m_config.ssid));
-        memcpy(wifi_config.ap.password, m_config.pass.data(), sizeof(m_config.pass));
+                .max_connection = CONFIG_AP_MAX_CONNECTIONS
+            }
+        };
 
-        RES_RETURN_ON_ERROR(esp_wifi_set_mode(new_mode));
-        RES_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-        RES_RETURN_ON_ERROR(esp_wifi_start());
+        // memcopy to avoid casting errors
+        memcpy(wifi_config.ap.ssid, m_config.ssid.data(), m_config.ssid.size());
+        memcpy(wifi_config.ap.password, m_config.pass.data(), m_config.pass.size());
+
+        RETURN_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
+        RETURN_ERR_MSG(esp_wifi_set_config(WIFI_IF_AP, &wifi_config), "esp_wifi_set_config: ");
+        
+
+        if(!m_wifi_initialized){
+            RETURN_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
+            m_wifi_initialized = true;
+        }
 
         ESP_LOGI(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
         return Ok(RUNNING);
     }
 

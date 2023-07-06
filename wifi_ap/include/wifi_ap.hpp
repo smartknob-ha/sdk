@@ -1,8 +1,6 @@
 #ifndef WIFI_AP_HPP
 #define WIFI_AP_HPP
 
-#include <string>
-#include <vector>
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_err.h"
@@ -12,7 +10,7 @@
 
 #include <etl/vector.h>
 
-#include "../../manager/include/component.hpp"
+#include "component.hpp"
 
 namespace sdk {
 
@@ -21,8 +19,8 @@ class wifi_ap : public component
 public:
     typedef struct
     {
-        etl::string<50> ssid;
-        etl::string<50> pass;
+        etl::string<31> ssid;
+        etl::string<63> pass;
         wifi_auth_mode_t authmode = WIFI_AUTH_WPA2_PSK;
         uint8_t channel = CONFIG_AP_CHANNEL;
     } wifi_ap_config_t;
@@ -32,7 +30,7 @@ public:
         esp_ip4_addr_t ip;
     } client_t;
 
-    wifi_ap(wifi_ap_config_t config);
+    wifi_ap(wifi_ap_config_t config) { m_config = config; };
 
     /* Component override functions */
     virtual etl::string<50> get_tag() override { return TAG; };
@@ -40,6 +38,10 @@ public:
     virtual res initialize() override;
     virtual res run() override;
     virtual res stop() override;
+    
+    // Initializes AP but waits until its fully started before returning
+    res initialize_blocking();
+    void set_config(wifi_ap_config_t config) { m_config = config; };
 
     etl::vector<client_t, CONFIG_AP_MAX_CONNECTIONS> get_connected_clients();
 
