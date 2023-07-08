@@ -5,10 +5,12 @@
 #include <etl/message_packet.h>
 #include <etl/message_bus.h>
 #include <etl/string.h>
+#include <etl/utility.h>
+#include <etl/vector.h>
 #include <thread>
 #include <result.h>
 
-#include "../../messages/include/messages.h"
+#include "component.hpp"
 
 namespace sdk {
 
@@ -36,7 +38,7 @@ class manager {
         static const inline char TAG[] = "Manager";
 
         /**
-         * Make sure this class is atomic 
+         * Make sure this class is atomic
          * and non-copyable
         */
         manager(void) {};
@@ -61,7 +63,7 @@ class manager {
 
         /**
          * @brief   restart_component will attempt to restart
-         *          a component after its' run() function  
+         *          a component after its' run() function
          *          has reported a direct error
         */
         void restart_component(c_entry& entry);

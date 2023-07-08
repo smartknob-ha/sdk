@@ -42,14 +42,14 @@ void test_component_should_be_restarted_after_run_error() {
 
     // We need to be able to make sure a restart was done
     test_component.set_initialize_return({
-        .status = ESP_OK,
+        .ok = true,
         .message = "",
         .called = false
     });
 
     test_component.set_run_return({
-        .status = ESP_ERR_INVALID_STATE,
-        .message = "forced error", 
+        .ok = false,
+        .message = "forced error",
         .called = false
     });
 
@@ -58,8 +58,8 @@ void test_component_should_be_restarted_after_run_error() {
     while (!test_component.run_called()) {}
 
     test_component.set_run_return({
-        .status = ESP_OK,
-        .message = "", 
+        .ok = true,
+        .message = "",
         .called = false
     });
 
@@ -72,13 +72,13 @@ void test_component_should_be_restarted_after_run_error() {
 void test_component_should_be_disabled_after_stop_error() {
     // Trigger call to restart_component
     test_component.set_run_return({
-        .status = ESP_ERR_INVALID_STATE,
-        .message = "forced error", 
+        .ok = false,
+        .message = "forced error",
         .called = false
     });
 
     test_component.set_stop_return({
-        .status = ESP_ERR_INVALID_STATE,
+        .ok = false,
         .message = "forced error",
         .called = false
     });
@@ -87,8 +87,8 @@ void test_component_should_be_disabled_after_stop_error() {
     while (!test_component.stop_called()) {}
 
     test_component.set_run_return({
-        .status = ESP_OK,
-        .message = "", 
+        .ok = true,
+        .message = "",
         .called = false
     });
 
@@ -100,9 +100,9 @@ void test_component_should_be_disabled_after_stop_error() {
 void test_component_should_be_disabled_after_initialize_error() {
     m.stop();
     sleep(1);
-    
+
     test_component.set_initialize_return({
-        .status = ESP_ERR_INVALID_STATE,
+        .ok = false,
         .message = "forced error",
         .called = false
     });
@@ -116,13 +116,13 @@ void test_component_should_be_disabled_after_initialize_error() {
 void test_component_should_be_disabled_after_initialize_error_in_restart() {
     // Trigger call to restart_component
     test_component.set_run_return({
-        .status = ESP_ERR_INVALID_STATE,
-        .message = "forced error", 
+        .ok = false,
+        .message = "forced error",
         .called = false
     });
 
     test_component.set_initialize_return({
-        .status = ESP_ERR_INVALID_STATE,
+        .ok = false,
         .message = "forced error",
         .called = false
     });
@@ -131,8 +131,8 @@ void test_component_should_be_disabled_after_initialize_error_in_restart() {
     while (!test_component.stop_called()) {}
 
     test_component.set_run_return({
-        .status = ESP_OK,
-        .message = "", 
+        .ok = true,
+        .message = "",
         .called = false
     });
 

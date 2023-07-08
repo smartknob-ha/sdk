@@ -98,7 +98,7 @@ namespace sdk
         {
             ret = esp_netif_dhcpc_start(sta.get_netif());
             if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED)
-                RES_RETURN_ON_ERROR(ret);
+                RETURN_ERR(ret);
             else
                 return Ok(RUNNING);
         }
@@ -106,7 +106,7 @@ namespace sdk
         {
             ret = esp_netif_dhcpc_stop(sta.get_netif());
             if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
-                RES_RETURN_ON_ERROR(ret);
+                RETURN_ERR(ret);
             else
             {
                 esp_netif_ip_info_t ip4_conf;
@@ -114,11 +114,11 @@ namespace sdk
                 inet_pton(AF_INET, m_config.ipv4_gateway.c_str(), &ip4_conf.gw);
                 inet_pton(AF_INET, m_config.ipv4_netmask.c_str(), &ip4_conf.netmask);
 
-                RES_RETURN_ON_ERROR(esp_netif_set_ip_info(sta.get_netif(), &ip4_conf));
+                RETURN_ERR(esp_netif_set_ip_info(sta.get_netif(), &ip4_conf));
 
                 esp_netif_dns_info_t dns_info;
                 inet_pton(AF_INET, m_config.ipv4_dns_main.c_str(), &dns_info.ip);
-                RES_RETURN_ON_ERROR(esp_netif_set_dns_info(sta.get_netif(), ESP_NETIF_DNS_MAIN, &dns_info));
+                RETURN_ERR(esp_netif_set_dns_info(sta.get_netif(), ESP_NETIF_DNS_MAIN, &dns_info));
 
                 // Only set secondary if it has been set
                 if (!m_config.ipv4_dns_secondary.empty())
