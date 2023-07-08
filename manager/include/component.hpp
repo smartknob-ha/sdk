@@ -40,12 +40,12 @@ typedef Result<COMPONENT_STATUS, etl::string<128>> res;
         Err(etl::string<128>(esp_err_to_name(esp_err)));                                                            \
     } while(0)
 
-#define RETURN_ERR_MSG(esp_err, err_msg)                                                                                \
+#define RETURN_ON_ERR_MSG(esp_err, err_msg)                                                                                \
     do {                                                                                                            \
         return Err(etl::string<128>(etl::string<128>(err_msg).substr(0, 104).append(esp_err_to_name(esp_err))));    \
     } while (0)
 
-#define RETURN_ERR(esp_err)                                                                                         \
+#define RETURN_ON_ERR(esp_err)                                                                                         \
     do {                                                                                                            \
         return Err(etl::string<128>(esp_err_to_name(esp_err)));                                                     \
     } while (0)
