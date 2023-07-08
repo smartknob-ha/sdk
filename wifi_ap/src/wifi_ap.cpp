@@ -15,8 +15,15 @@
 #include <etl/type_traits.h>
 #include <etl/container.h>
 
+#define AP_INITIALIZED_BIT  BIT0
+
 namespace sdk
 {
+    wifi_ap::wifi_ap(wifi_ap_config_t config) : m_config(config)
+    {
+        event_group = xEventGroupCreate();
+    }
+
     res wifi_ap::get_status()
     {
         return Ok(RUNNING);
@@ -41,9 +48,18 @@ namespace sdk
         return Ok(STOPPED);
     }
 
-    res wifi_ap::initialize()
+    res wifi_ap::initialize() {
+        auto ret = initialize_non_blocking();
+        if (ret.isErr())
+            return ret;
+
+        // Wait for AP_INITIALIZED_BIT to be set by the event handler
+        xEventGroupWaitBits(event_group, AP_INITIALIZED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+        return Ok(RUNNING);
+    }
+
+    res wifi_ap::initialize_non_blocking()
     {
-        vTaskDelay(9000 / portTICK_PERIOD_MS);
         wifi_mode_t current_mode = WIFI_MODE_NULL, new_mode = WIFI_MODE_AP;
         esp_err_t err = esp_wifi_get_mode(&current_mode);
 
@@ -86,16 +102,14 @@ namespace sdk
 
         RETURN_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
         RETURN_ERR_MSG(esp_wifi_set_config(WIFI_IF_AP, &wifi_config), "esp_wifi_set_config: ");
-        
 
         if(!m_wifi_initialized){
             RETURN_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
             m_wifi_initialized = true;
         }
 
-        ESP_LOGI(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
-        return Ok(RUNNING);
+        ESP_LOGD(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
+        return Ok(INITIALIZING);
     }
 
     void wifi_ap::ap_event_handler(void *arg, esp_event_base_t event_base,
@@ -104,6 +118,7 @@ namespace sdk
         switch (event_id)
         {
         case WIFI_EVENT_AP_START: {
+            xEventGroupSetBits(event_group, AP_INITIALIZED_BIT);
             ESP_LOGI(TAG, "AP has started");
             break;
         }

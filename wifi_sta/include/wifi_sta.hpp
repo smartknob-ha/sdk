@@ -7,6 +7,7 @@
 #include "esp_netif_ip_addr.h"
 #include "esp_wifi_types.h"
 #include "esp_wifi.h"
+#include "freertos/event_groups.h"
 
 #include <etl/vector.h>
 
@@ -28,7 +29,7 @@ class sta : public component
 {
 public:
     
-    sta(sta_config_t config) { m_config = config; };
+    sta(sta_config_t config);
     ~sta() = default;
 
     /* Component override functions */
@@ -38,6 +39,8 @@ public:
     virtual res run() override;
     virtual res stop() override;
 
+    // Initializes sta but returns while it may not be finished starting up
+    res initialize_non_blocking();
     esp_netif_t* get_netif() { return m_esp_netif; };
     void set_config(sta_config_t config) { m_config = config; };
     etl::string<15> get_assigned_ip() { return m_assigned_ip; };
@@ -53,6 +56,8 @@ private:
     static void sta_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
     res error_check(esp_err_t err);
+
+    static inline EventGroupHandle_t event_group;
 };
 
 } /* namespace wifi */

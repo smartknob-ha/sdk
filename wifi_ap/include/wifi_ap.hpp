@@ -7,6 +7,7 @@
 #include "esp_netif_ip_addr.h"
 #include "esp_wifi_types.h"
 #include "esp_wifi.h"
+#include "freertos/event_groups.h"
 
 #include <etl/vector.h>
 
@@ -30,7 +31,7 @@ public:
         esp_ip4_addr_t ip;
     } client_t;
 
-    wifi_ap(wifi_ap_config_t config) { m_config = config; };
+    wifi_ap(wifi_ap_config_t config);
 
     /* Component override functions */
     virtual etl::string<50> get_tag() override { return TAG; };
@@ -39,8 +40,8 @@ public:
     virtual res run() override;
     virtual res stop() override;
     
-    // Initializes AP but waits until its fully started before returning
-    res initialize_blocking();
+    // Initializes AP but returns while it may not be finished starting up
+    res initialize_non_blocking();
     void set_config(wifi_ap_config_t config) { m_config = config; };
 
     etl::vector<client_t, CONFIG_AP_MAX_CONNECTIONS> get_connected_clients();
@@ -56,6 +57,8 @@ private:
     static void ap_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
     res error_check(esp_err_t err);
+
+    static inline EventGroupHandle_t event_group;
 };
 
 } /* namespace sdk */

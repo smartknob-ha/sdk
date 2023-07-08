@@ -15,10 +15,16 @@
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 
+#define STA_CONNECTED_BIT		BIT0
+#define STA_DISCONNECTED_BIT	BIT1
+
 namespace sdk
 {
-
 	namespace wifi {
+
+	sta::sta(sta_config_t config) : m_config(config) {
+        event_group = xEventGroupCreate();
+	}
 
 	res sta::get_status()
 	{
@@ -45,10 +51,28 @@ namespace sdk
 		return Ok(STOPPED);
 	}
 
-	res sta::initialize()
+    res sta::initialize() {
+        auto ret = initialize_non_blocking();
+        if (ret.isErr())
+            return ret;
+
+        // Wait for one of the bits to be set by the event handler
+        EventBits_t bits = xEventGroupWaitBits(event_group, 
+							STA_CONNECTED_BIT | STA_DISCONNECTED_BIT, 
+							pdFALSE, 
+							pdFALSE, 
+							30000 / portTICK_PERIOD_MS); // 30 seconds
+
+		if (bits == STA_DISCONNECTED_BIT)
+			return Err(etl::string<128>("STA Disconnected"));
+		else if (bits == STA_CONNECTED_BIT)
+			return Ok(RUNNING);
+        else
+			return Err(etl::string<128>("Wifi connection timed out after 30 seconds"));
+    }
+
+	res sta::initialize_non_blocking()
 	{
-		vTaskDelay(3000 / portTICK_PERIOD_MS);
-		printf("SSID: %s ; pass: %s\n", m_config.ssid.c_str(), m_config.pass.c_str());
 		wifi_mode_t current_mode = WIFI_MODE_NULL, new_mode = WIFI_MODE_STA;
 		esp_err_t err = esp_wifi_get_mode(&current_mode);
 		if (err == ESP_OK && current_mode == WIFI_MODE_STA)
@@ -83,6 +107,7 @@ namespace sdk
 																&sta_event_handler,
 																NULL,
 																NULL), "esp_event_handler_instance_register: ");
+																
 		wifi_config_t wifi_config = {
 			.sta = {
 				.bssid_set = false,
@@ -126,11 +151,13 @@ namespace sdk
 		}
 		case WIFI_EVENT_STA_CONNECTED:
 		{
+            xEventGroupSetBits(event_group, STA_CONNECTED_BIT);
 			ESP_LOGI(TAG, "Connected to a network");
 			break;
 		}
 		case WIFI_EVENT_STA_DISCONNECTED:
 		{
+            xEventGroupSetBits(event_group, STA_DISCONNECTED_BIT);
 			wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
 			ESP_LOGI(TAG, "Disconnected from a network, reason: %u", event->reason);
 			break;
