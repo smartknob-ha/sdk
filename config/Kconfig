@@ -1,3 +1,5 @@
 menu "Smartknob-HA SDK Config"
     rsource "../manager/config"
+    rsource "../wifi/config"
+    rsource "../network_manager/config"
 endmenu
