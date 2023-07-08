@@ -53,7 +53,7 @@ namespace sdk
         return Ok(RUNNING);
     }
 
-    res network_manager::set_ap(bool state)
+    res network_manager::set_ap_state(bool state)
     {
         if (state)
             return ap.initialize();
@@ -61,14 +61,12 @@ namespace sdk
             return ap.stop();
     }
 
-    res network_manager::set_ap(bool state, wifi::ap_config_t conf)
+    void network_manager::set_ap_conf(wifi::ap_config_t conf)
     {
         m_config.ap = conf;
-        ap.set_config(conf);
-        return set_ap(state);
     }
 
-    res network_manager::set_sta(bool state)
+    res network_manager::set_sta_state(bool state)
     {
         if (state)
         {
@@ -83,11 +81,9 @@ namespace sdk
             return sta.stop();
     }
 
-    res network_manager::set_sta(bool state, wifi::sta_config_t conf)
+    void network_manager::set_sta_conf(wifi::sta_config_t conf)
     {
         m_config.sta = conf;
-        sta.set_config(conf);
-        return set_sta(state);
     }
 
     res network_manager::set_ip_mode(bool state)

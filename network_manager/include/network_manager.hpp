@@ -39,10 +39,10 @@ namespace sdk
 
         /* state = true for DHCP, false for static IP */
         res set_ip_mode(bool state);
-        res set_sta(bool state);
-        res set_sta(bool state, wifi::sta_config_t conf);
-        res set_ap(bool state);
-        res set_ap(bool state, wifi::ap_config_t conf);
+        res set_sta_state(bool state);
+        void set_sta_conf(wifi::sta_config_t conf);
+        res set_ap_state(bool state);
+        void set_ap_conf(wifi::ap_config_t conf);
 
         void init_sntp();
 
