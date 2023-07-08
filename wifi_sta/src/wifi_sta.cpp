@@ -95,7 +95,15 @@ namespace sdk
 			wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 			RETURN_ERR_MSG(esp_wifi_init(&cfg), "esp_wifi_init: ");
 		}
-		m_esp_netif = esp_netif_create_default_wifi_sta();
+
+		esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
+		// Default config has DHCP client enabled on startup, we will do this manually later (if configured)
+		esp_netif_config.flags = (esp_netif_flags_t)( ESP_NETIF_FLAG_GARP | ESP_NETIF_FLAG_EVENT_IP_MODIFIED);
+    	m_esp_netif = esp_netif_create_wifi(WIFI_IF_STA, &esp_netif_config);
+		
+		esp_wifi_set_default_wifi_sta_handlers();
+
+		esp_netif_set_hostname(m_esp_netif, m_config.hostname.c_str());
 
 		RETURN_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT,
 																ESP_EVENT_ANY_ID,
