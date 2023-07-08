@@ -46,7 +46,8 @@ public:
     res initialize_non_blocking();
     void set_config(ap_config_t config) { m_config = config; };
 
-    etl::vector<ap_client_t, CONFIG_AP_MAX_CONNECTIONS> get_connected_clients();
+    //TODO: Implement function
+    //etl::vector<ap_client_t, CONFIG_AP_MAX_CONNECTIONS> get_connected_clients();
 
 private:
     static const inline char TAG[] = "Wifi AP";
