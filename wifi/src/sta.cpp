@@ -44,10 +44,10 @@ namespace sdk
 			ESP_LOGW(TAG, "Wifi is not running, returning");
 		else if (err == ESP_OK && current_mode == WIFI_MODE_STA)
 		{
-			RETURN_ERR_MSG(esp_wifi_stop(), "esp_wifi_stop: ");
+			RETURN_ON_ERR_MSG(esp_wifi_stop(), "esp_wifi_stop: ");
 		}
 		else if (err == ESP_OK && current_mode == WIFI_MODE_APSTA)
-			RETURN_ERR_MSG(esp_wifi_set_mode(WIFI_MODE_AP), "esp_wifi_set_mode: ");
+			RETURN_ON_ERR_MSG(esp_wifi_set_mode(WIFI_MODE_AP), "esp_wifi_set_mode: ");
 		return Ok(STOPPED);
 	}
 
@@ -91,9 +91,9 @@ namespace sdk
 			ESP_LOGI(TAG, "Initializing wifi STA");
 			// Don't care about return value as it either initializes, or it's already initialized
 			esp_netif_init();
-			RETURN_ERR_MSG(esp_event_loop_create_default(), "esp_event_loop_create_default");
+			RETURN_ON_ERR_MSG(esp_event_loop_create_default(), "esp_event_loop_create_default");
 			wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-			RETURN_ERR_MSG(esp_wifi_init(&cfg), "esp_wifi_init: ");
+			RETURN_ON_ERR_MSG(esp_wifi_init(&cfg), "esp_wifi_init: ");
 		}
 
 		esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
@@ -105,12 +105,12 @@ namespace sdk
 
 		esp_netif_set_hostname(m_esp_netif, m_config.hostname.c_str());
 
-		RETURN_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT,
+		RETURN_ON_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT,
 																ESP_EVENT_ANY_ID,
 																&sta_event_handler,
 																NULL,
 																NULL), "esp_event_handler_instance_register: ");
-		RETURN_ERR_MSG(esp_event_handler_instance_register(IP_EVENT,
+		RETURN_ON_ERR_MSG(esp_event_handler_instance_register(IP_EVENT,
 																IP_EVENT_STA_GOT_IP,
 																&sta_event_handler,
 																NULL,
@@ -128,14 +128,14 @@ namespace sdk
 		memcpy(wifi_config.sta.ssid, m_config.ssid.data(), m_config.ssid.size());
 		memcpy(wifi_config.sta.password, m_config.pass.data(), m_config.pass.size());
 
-		RETURN_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
-		RETURN_ERR_MSG(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), "esp_wifi_set_config: ");
+		RETURN_ON_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
+		RETURN_ON_ERR_MSG(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), "esp_wifi_set_config: ");
 
 		if(!m_wifi_initialized) {
-			RETURN_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
+			RETURN_ON_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
 			m_wifi_initialized = true;
 		}
-		RETURN_ERR_MSG(esp_wifi_connect(), "esp_wifi_connect: ");
+		RETURN_ON_ERR_MSG(esp_wifi_connect(), "esp_wifi_connect: ");
 
 		ESP_LOGI(TAG, "Attempting to connect to: \"%s\"", wifi_config.sta.ssid);
 
@@ -187,7 +187,7 @@ namespace sdk
 		}
 		case WIFI_EVENT_MAX:
 		{
-			ESP_LOGE(TAG, "Perhaps the archives were incomplete");
+			ESP_LOGE(TAG, "Perhaps the archives are incomplete");
 			break;
 		}
 		}
