@@ -52,20 +52,37 @@ typedef Result<COMPONENT_STATUS, etl::string<128>> res;
 
 template<UBaseType_t LEN, typename QUEUETYPE, TickType_t ENQUEUE_TIMEOUT>
 class has_queue {
-    public:
-        has_queue() : m_queue(xQueueCreateStatic(LEN, sizeof(QUEUETYPE), m_queue_storage, &m_queue_data)) {};
+public:
+	has_queue() : m_queue(xQueueCreateStatic(LEN, sizeof(QUEUETYPE), m_queue_storage, &m_queue_data)) {};
 
-        void enqueue(QUEUETYPE& item) { xQueueSend(m_queue, (void*) &item, ENQUEUE_TIMEOUT); }
+	/**
+	 * @brief Enqueues new message
+	 * @param item Reference to message
+	 * @attention When you inherit multiple has_queue classes with different types, overload this function for each type
+	 * 	like this: `void enqueue(your_type& message) override { has_queue<1, your_type, 0>::enqueue(message); }`
+	 */
+	virtual void enqueue(QUEUETYPE& item) {
+		xQueueSend(m_queue, (void*) &item, ENQUEUE_TIMEOUT);
+	}
 
-        ~has_queue() {
-            vQueueUnregisterQueue(m_queue);
-        }
-    protected:
-        QueueHandle_t m_queue;
+	~has_queue() {
+		vQueueUnregisterQueue(m_queue);
+	}
+protected:
+	/**
+	 * @brief Pops a message from the queue
+	 * @param item Reference to variable which will be filled with data
+	 * @param xTicksToWait Maximum ticks to wait, if 0 this function is non-blocking
+	 * @return pdTRUE if a message was read, pdFALSE if not
+	 */
+	BaseType_t dequeue(QUEUETYPE& item, TickType_t xTicksToWait) {
+		return xQueueReceive(m_queue, (void*) &item, xTicksToWait);
+	}
 
-    private:
-        uint8_t m_queue_storage [ LEN * sizeof(QUEUETYPE) ];
-        StaticQueue_t m_queue_data;
+private:
+	uint8_t m_queue_storage [ LEN * sizeof(QUEUETYPE) ]{};
+	StaticQueue_t m_queue_data{};
+	QueueHandle_t m_queue{};
 };
 
 /**
