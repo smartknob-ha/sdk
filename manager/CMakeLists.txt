@@ -1,5 +1,5 @@
 set(COMPONENT_ADD_INCLUDEDIRS "include")
-set(COMPONENT_SRCS "src/manager.cpp")
+set(COMPONENT_SRCS "src/Manager.cpp")
 
 set(COMPONENT_NAME "Smartknob-HA SDK Manager")
 
