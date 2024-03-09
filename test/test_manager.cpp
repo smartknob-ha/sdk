@@ -1,13 +1,10 @@
+#include "../../manager/include/Manager.hpp"
+#include "MockComponent.hpp"
 #include "unity.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+sdk::Manager& m = sdk::Manager::instance();
 
-#include "../../manager/include/manager.hpp"
-#include "../../mock_component/include/mock_component.hpp"
-
-sdk::manager& m = sdk::manager::instance();
-sdk::mock_component test_component;
+sdk::MockComponent testComponent;
 
 // Repeated for each test
 void setUp() {
@@ -16,144 +13,124 @@ void setUp() {
 
 // Repeated after each test
 void tearDown() {
-    sdk::manager::instance().stop();
+    sdk::Manager::instance().stop();
     usleep(200);
-    test_component.reset();
+    testComponent.reset();
 }
 
-void test_instance_should_always_return_same_reference() {
-    sdk::manager& ref_first = sdk::manager::instance();
-    sdk::manager& ref_second = sdk::manager::instance();
+void testInstanceShouldAlwaysReturnSameReference() {
+    sdk::Manager& refFirst  = sdk::Manager::instance();
+    sdk::Manager& refSecond = sdk::Manager::instance();
 
-    TEST_ASSERT_TRUE(&ref_first == &ref_second);
+    TEST_ASSERT_TRUE(&refFirst == &refSecond);
 }
 
-void test_added_component_should_be_initialized_and_ran() {
+void testAddedComponentShouldBeInitializedAndRan() {
     usleep(200);
 
-    TEST_ASSERT_TRUE(test_component.initialize_called());
-    TEST_ASSERT_TRUE(test_component.run_called());
+    TEST_ASSERT_TRUE(testComponent.initialize_called());
+    TEST_ASSERT_TRUE(testComponent.run_called());
 }
 
-void test_component_should_be_restarted_after_run_error() {
+void testComponentShouldBeRestartedAfterRunError() {
     // Make sure thread is running
-    while (!test_component.initialize_called()) {};
-    while (!test_component.run_called()) {};
+    while (!testComponent.initialize_called()) {};
+    while (!testComponent.run_called()) {};
 
     // We need to be able to make sure a restart was done
-    test_component.set_initialize_return({
-        .ok = true,
-        .message = "",
-        .called = false
-    });
+    testComponent.set_initialize_return({.ok      = true,
+                                         .message = "",
+                                         .called  = false});
 
-    test_component.set_run_return({
-        .ok = false,
-        .message = "forced error",
-        .called = false
-    });
+    testComponent.set_run_return({.ok      = false,
+                                  .message = "forced error",
+                                  .called  = false});
 
     sleep(1);
 
-    while (!test_component.run_called()) {}
+    while (!testComponent.run_called()) {}
 
-    test_component.set_run_return({
-        .ok = true,
-        .message = "",
-        .called = false
-    });
+    testComponent.set_run_return({.ok      = true,
+                                  .message = "",
+                                  .called  = false});
 
     sleep(1);
 
-    TEST_ASSERT_TRUE_MESSAGE(test_component.initialize_called(), "initialize not called");
-    TEST_ASSERT_TRUE_MESSAGE(test_component.run_called(), "run not called");
+    TEST_ASSERT_TRUE_MESSAGE(testComponent.initialize_called(), "initialize not called");
+    TEST_ASSERT_TRUE_MESSAGE(testComponent.run_called(), "run not called");
 }
 
-void test_component_should_be_disabled_after_stop_error() {
+void testComponentShouldBeDisabledAfterStopError() {
     // Trigger call to restart_component
-    test_component.set_run_return({
-        .ok = false,
-        .message = "forced error",
-        .called = false
-    });
+    testComponent.set_run_return({.ok      = false,
+                                  .message = "forced error",
+                                  .called  = false});
 
-    test_component.set_stop_return({
-        .ok = false,
-        .message = "forced error",
-        .called = false
-    });
+    testComponent.set_stop_return({.ok      = false,
+                                   .message = "forced error",
+                                   .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
-    while (!test_component.stop_called()) {}
+    while (!testComponent.stop_called()) {}
 
-    test_component.set_run_return({
-        .ok = true,
-        .message = "",
-        .called = false
-    });
+    testComponent.set_run_return({.ok      = true,
+                                  .message = "",
+                                  .called  = false});
 
     usleep(200);
 
-    TEST_ASSERT_FALSE_MESSAGE(test_component.run_called(), "didn't expect run to get called");
+    TEST_ASSERT_FALSE_MESSAGE(testComponent.run_called(), "didn't expect run to get called");
 }
 
-void test_component_should_be_disabled_after_initialize_error() {
+void testComponentShouldBeDisabledAfterInitializeError() {
     m.stop();
     sleep(1);
 
-    test_component.set_initialize_return({
-        .ok = false,
-        .message = "forced error",
-        .called = false
-    });
+    testComponent.set_initialize_return({.ok      = false,
+                                         .message = "forced error",
+                                         .called  = false});
 
     m.start();
     sleep(1);
 
-    TEST_ASSERT_FALSE(test_component.run_called());
+    TEST_ASSERT_FALSE(testComponent.run_called());
 }
 
-void test_component_should_be_disabled_after_initialize_error_in_restart() {
+void testComponentShouldBeDisabledAfterInitializeErrorInRestart() {
     // Trigger call to restart_component
-    test_component.set_run_return({
-        .ok = false,
-        .message = "forced error",
-        .called = false
-    });
+    testComponent.set_run_return({.ok      = false,
+                                  .message = "forced error",
+                                  .called  = false});
 
-    test_component.set_initialize_return({
-        .ok = false,
-        .message = "forced error",
-        .called = false
-    });
+    testComponent.set_initialize_return({.ok      = false,
+                                         .message = "forced error",
+                                         .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
-    while (!test_component.stop_called()) {}
+    while (!testComponent.stop_called()) {}
 
-    test_component.set_run_return({
-        .ok = true,
-        .message = "",
-        .called = false
-    });
+    testComponent.set_run_return({.ok      = true,
+                                  .message = "",
+                                  .called  = false});
 
     sleep(1);
 
-    TEST_ASSERT_FALSE(test_component.run_called());
+    TEST_ASSERT_FALSE(testComponent.run_called());
 }
 
 extern "C" {
 
-int app_main(void) {
-    m.add_component(test_component);
+auto app_main(void) -> int {
+    m.addComponent(testComponent);
 
     UNITY_BEGIN();
 
-    RUN_TEST(test_instance_should_always_return_same_reference);
-    RUN_TEST(test_added_component_should_be_initialized_and_ran);
-    RUN_TEST(test_component_should_be_restarted_after_run_error);
-    RUN_TEST(test_component_should_be_disabled_after_stop_error);
-    RUN_TEST(test_component_should_be_disabled_after_initialize_error);
-    RUN_TEST(test_component_should_be_disabled_after_initialize_error_in_restart);
+    RUN_TEST(testInstanceShouldAlwaysReturnSameReference);
+    RUN_TEST(testAddedComponentShouldBeInitializedAndRan);
+    RUN_TEST(testComponentShouldBeRestartedAfterRunError);
+    RUN_TEST(testComponentShouldBeDisabledAfterStopError);
+    RUN_TEST(testComponentShouldBeDisabledAfterInitializeError);
+    RUN_TEST(testComponentShouldBeDisabledAfterInitializeErrorInRestart);
 
     return UNITY_END();
 }
