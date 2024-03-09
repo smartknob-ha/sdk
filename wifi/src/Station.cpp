@@ -34,13 +34,13 @@ namespace sdk {
         }
 
         res Station::stop() {
-            wifi_mode_t current_mode = WIFI_MODE_NULL;
-            esp_err_t   err          = esp_wifi_get_mode(&current_mode);
+            wifi_mode_t currentMode  = WIFI_MODE_NULL;
+            esp_err_t   err          = esp_wifi_get_mode(&currentMode);
             if (err == ESP_ERR_WIFI_NOT_INIT)
                 ESP_LOGW(TAG, "Wifi is not running, returning");
-            else if (err == ESP_OK && current_mode == WIFI_MODE_STA) {
+            else if (err == ESP_OK && currentMode == WIFI_MODE_STA) {
                 RETURN_ON_ERR_MSG(esp_wifi_stop(), "esp_wifi_stop: ");
-            } else if (err == ESP_OK && current_mode == WIFI_MODE_APSTA)
+            } else if (err == ESP_OK && currentMode == WIFI_MODE_APSTA)
                 RETURN_ON_ERR_MSG(esp_wifi_set_mode(WIFI_MODE_AP), "esp_wifi_set_mode: ");
             return Ok(ComponentStatus::STOPPED);
         }
@@ -88,36 +88,36 @@ namespace sdk {
             esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
             // Default config has DHCP client enabled on startup, we will do this manually later (if configured)
             esp_netif_config.flags = (esp_netif_flags_t) (ESP_NETIF_FLAG_GARP | ESP_NETIF_FLAG_EVENT_IP_MODIFIED);
-            m_esp_netif            = esp_netif_create_wifi(WIFI_IF_STA, &esp_netif_config);
+            m_networkInterface     = esp_netif_create_wifi(WIFI_IF_STA, &esp_netif_config);
 
             esp_wifi_set_default_wifi_sta_handlers();
 
-            esp_netif_set_hostname(m_esp_netif, m_config.hostname.c_str());
+            esp_netif_set_hostname(m_networkInterface, m_config.hostname.c_str());
 
             RETURN_ON_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT,
                                                                   ESP_EVENT_ANY_ID,
-                                                                  &stationEventHandler,
+                                                                  &eventHandler,
                                                                   NULL,
                                                                   NULL),
                               "esp_event_handler_instance_register: ");
             RETURN_ON_ERR_MSG(esp_event_handler_instance_register(IP_EVENT,
                                                                   IP_EVENT_STA_GOT_IP,
-                                                                  &stationEventHandler,
+                                                                  &eventHandler,
                                                                   NULL,
                                                                   NULL),
                               "esp_event_handler_instance_register: ");
 
-            wifi_config_t wifi_config = {
+            wifi_config_t wifiConfig = {
                     .sta = {
                             .bssid_set = false,
                             .pmf_cfg   = {
                                       .required = true}}};
 
-            memcpy(wifi_config.sta.ssid, m_config.ssid.data(), m_config.ssid.size());
-            memcpy(wifi_config.sta.password, m_config.pass.data(), m_config.pass.size());
+            memcpy(wifiConfig.sta.ssid, m_config.ssid.data(), m_config.ssid.size());
+            memcpy(wifiConfig.sta.password, m_config.pass.data(), m_config.pass.size());
 
             RETURN_ON_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
-            RETURN_ON_ERR_MSG(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), "esp_wifi_set_config: ");
+            RETURN_ON_ERR_MSG(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig), "esp_wifi_set_config: ");
 
             if (!m_wifiInitialized) {
                 RETURN_ON_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
@@ -125,14 +125,14 @@ namespace sdk {
             }
             RETURN_ON_ERR_MSG(esp_wifi_connect(), "esp_wifi_connect: ");
 
-            ESP_LOGI(TAG, "Attempting to connect to: \"%s\"", wifi_config.sta.ssid);
+            ESP_LOGI(TAG, "Attempting to connect to: \"%s\"", wifiConfig.sta.ssid);
 
             return Ok(ComponentStatus::RUNNING);
         }
 
-        void Station::stationEventHandler(void* arg, esp_event_base_t event_base,
-                                          int32_t event_id, void* event_data) {
-            switch (event_id) {
+        void Station::eventHandler(void* arg, esp_event_base_t eventBase,
+                                          int32_t eventId, void* eventData) {
+            switch (eventId) {
                 case WIFI_EVENT_STA_START: {
                     ESP_LOGI(TAG, "STA has started");
                     break;
@@ -148,7 +148,7 @@ namespace sdk {
                 }
                 case WIFI_EVENT_STA_DISCONNECTED: {
                     xEventGroupSetBits(eventGroup, STA_DISCONNECTED_BIT);
-                    wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
+                    wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) eventData;
                     ESP_LOGI(TAG, "Disconnected from a network, reason: %u", event->reason);
                     break;
                 }

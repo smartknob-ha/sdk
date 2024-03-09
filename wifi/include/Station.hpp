@@ -36,7 +36,7 @@ namespace sdk::wifi {
 
         // Initializes sta but returns while it may not be finished starting up
         res             initializeNonBlocking();
-        esp_netif_t*    getNetif() { return m_esp_netif; };
+        esp_netif_t*    getNetif() { return m_networkInterface; };
         void            setConfig(Config config) { m_config = config; };
         etl::string<15> getAssignedIp() { return m_assignedIp; };
 
@@ -44,11 +44,11 @@ namespace sdk::wifi {
         static const inline char TAG[] = "Wifi STA";
 
         Config             m_config;
-        esp_netif_t*       m_esp_netif;
+        esp_netif_t*       m_networkInterface;
         etl::string<15>    m_assignedIp;
         static inline bool m_wifiInitialized = false;
 
-        static void stationEventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+        static void eventHandler(void* arg, esp_event_base_t eventBase, int32_t eventId, void* eventData);
 
         res errorCheck(esp_err_t err);
 

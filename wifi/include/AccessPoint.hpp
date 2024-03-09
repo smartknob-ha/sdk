@@ -45,13 +45,13 @@ namespace sdk {
             void setConfig(Config config) { m_config = config; };
 
             // TODO: Implement function
-            // etl::vector<ap_client_t, CONFIG_AP_MAX_CONNECTIONS> get_connected_clients();
+            // etl::vector<ap_client_t, CONFIG_AP_MAX_CONNECTIONS> get_connectedClients();
 
         private:
             static const inline char TAG[] = "Wifi AP";
 
             Config                                         m_config;
-            etl::vector<Client, CONFIG_AP_MAX_CONNECTIONS> m_connected_clients;
+            etl::vector<Client, CONFIG_AP_MAX_CONNECTIONS> m_connectedClients;
             esp_netif_t*                                   m_espNetif;
             static inline bool                             m_wifiInitialized = false;
 

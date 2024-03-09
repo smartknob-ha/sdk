@@ -81,21 +81,21 @@ namespace sdk {
             if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
                 RETURN_ON_ERR(ret);
             else {
-                esp_netif_ip_info_t ip4_conf;
-                inet_pton(AF_INET, m_config.ipv4Address.c_str(), &ip4_conf.ip);
-                inet_pton(AF_INET, m_config.ipv4Gateway.c_str(), &ip4_conf.gw);
-                inet_pton(AF_INET, m_config.ipv4Netmask.c_str(), &ip4_conf.netmask);
+                esp_netif_ip_info_t ip4Conf;
+                inet_pton(AF_INET, m_config.ipv4Address.c_str(), &ip4Conf.ip);
+                inet_pton(AF_INET, m_config.ipv4Gateway.c_str(), &ip4Conf.gw);
+                inet_pton(AF_INET, m_config.ipv4Netmask.c_str(), &ip4Conf.netmask);
 
-                RETURN_ON_ERR(esp_netif_set_ip_info(sta.getNetif(), &ip4_conf));
+                RETURN_ON_ERR(esp_netif_set_ip_info(sta.getNetif(), &ip4Conf));
 
-                esp_netif_dns_info_t dns_info;
-                inet_pton(AF_INET, m_config.ipv4DnsMain.c_str(), &dns_info.ip);
-                RETURN_ON_ERR(esp_netif_set_dns_info(sta.getNetif(), ESP_NETIF_DNS_MAIN, &dns_info));
+                esp_netif_dns_info_t dnsInfo;
+                inet_pton(AF_INET, m_config.ipv4DnsMain.c_str(), &dnsInfo.ip);
+                RETURN_ON_ERR(esp_netif_set_dns_info(sta.getNetif(), ESP_NETIF_DNS_MAIN, &dnsInfo));
 
                 // Only set secondary if it has been set
                 if (!m_config.ipv4DnsSecondary.empty()) {
-                    inet_pton(AF_INET, m_config.ipv4DnsSecondary.c_str(), &dns_info.ip);
-                    esp_netif_set_dns_info(sta.getNetif(), ESP_NETIF_DNS_BACKUP, &dns_info);
+                    inet_pton(AF_INET, m_config.ipv4DnsSecondary.c_str(), &dnsInfo.ip);
+                    esp_netif_set_dns_info(sta.getNetif(), ESP_NETIF_DNS_BACKUP, &dnsInfo);
                 }
             }
         }
