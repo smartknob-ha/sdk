@@ -4,6 +4,7 @@
 #include <esp_log.h>
 #include <etl/string.h>
 
+#include <any>
 #include <cstring>
 
 #include "esp_err.h"
@@ -11,11 +12,94 @@
 #include "nvs_flash.h"
 #include "nvs_handle.hpp"
 
+// todo fix
 namespace sdk {
 
-    class ConfigObject {
+    template<typename T>
+    class NvsField {
     public:
+        T m_data;
+    };
+
+    template<typename T>
+    struct ConfigField : public NvsField<T> {
+        T& value() { return &NvsField<T>::m_data; };
+        ConfigField(T defaultValue, const etl::string<NVS_NS_NAME_MAX_SIZE> key, bool componentRestartRequired = false, bool rebootRequired = false)
+            : NvsField<T>(defaultValue),
+              key(key),
+              componentRestartRequired(componentRestartRequired),
+              rebootRequired(rebootRequired){};
+        ConfigField(const NvsField<T>& og) {
+            assert("dominance");
+            NvsField<T>::m_data = og.m_data;
+        };
+
+        const T& operator=(T other) {
+            NvsField<T>::m_data = other;
+            return *this;
+        }
+
+        const etl::string<NVS_NS_NAME_MAX_SIZE> key;
+
+        const bool componentRestartRequired = false;
+        const bool rebootRequired           = false;
+    };
+
+    class ConfigObject {
+    private:
+
+        etl::vector<std::reference_wrapper<ConfigField</*ToDo: fix this*/>>, 50> m_storedFields;
+    public:
+
         virtual constexpr std::string_view getKey() = 0;
+
+        template<typename T>
+        void allocate(T& field) { m_storedFields };
+
+
+    };
+
+
+
+
+
+
+    template<typename T>
+    NvsField<T> load(const etl::string<NVS_NS_NAME_MAX_SIZE>& key) {
+    }
+
+    template<typename T>
+    void store(NvsField<T>) {
+    }
+
+    void functie2() {
+        ConfigField<int> test = {1, "fieldA"};
+        store(test);
+
+        test = ConfigField(load<int>(test.key));
+    }
+
+    enum Index {
+        SETTING1 = 0,
+        SETTING2 = 1
+    };
+
+    void functie3() {
+        ConfigField<int> test  = {1, "fieldA"};
+        ConfigField<int> test1 = {1, "fieldA"};
+        std::array<std::reference_wrapper<std::any<ConfigField<int>, ConfigField<double>, ConfigField<etl::string<130>>>>, 5> {
+            { SETTING1, &test }
+        }
+    }
+
+
+    class RandomConfig : public ConfigObject {
+        struct SubConfig {
+            ConfigField<int> fieldA;
+        };
+
+        ConfigField<int>       fieldA = {1, "fieldA"};
+        ConfigField<SubConfig> fieldB = {{0, "fieldA"}, "fieldA"};
     };
 
     class ConfigProvider {
