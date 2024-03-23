@@ -3,6 +3,7 @@
 
 #include <esp_log.h>
 #include <etl/string.h>
+#include <etl/map.h>
 
 #include <any>
 #include <cstring>
@@ -12,8 +13,14 @@
 #include "nvs_flash.h"
 #include "nvs_handle.hpp"
 
+#include <any>
+#include <typeindex>
+#include <nlohmann/json.hpp>
+
 // todo fix
 namespace sdk {
+
+    using ConfigKey = etl::string<NVS_NS_NAME_MAX_SIZE>;
 
     template<typename T>
     class NvsField {
@@ -23,84 +30,114 @@ namespace sdk {
 
     template<typename T>
     struct ConfigField : public NvsField<T> {
-        T& value() { return &NvsField<T>::m_data; };
-        ConfigField(T defaultValue, const etl::string<NVS_NS_NAME_MAX_SIZE> key, bool componentRestartRequired = false, bool rebootRequired = false)
-            : NvsField<T>(defaultValue),
-              key(key),
-              componentRestartRequired(componentRestartRequired),
-              rebootRequired(rebootRequired){};
-        ConfigField(const NvsField<T>& og) {
-            assert("dominance");
-            NvsField<T>::m_data = og.m_data;
-        };
+    private:
+        const ConfigKey m_key;
 
-        const T& operator=(T other) {
-            NvsField<T>::m_data = other;
+        const bool m_componentRestartRequired{false};
+        const bool m_rebootRequired{false};
+
+        const std::type_index m_type{std::type_identity<T>()};
+
+    public:
+        T& value() { return NvsField<T>::m_data; };
+
+        ConfigField(std::any defaultValue, const ConfigKey key, bool componentRestartRequired = false, bool rebootRequired = false)
+            : NvsField<T>(std::any_cast<T>(defaultValue)),
+              m_key(key),
+              m_componentRestartRequired(componentRestartRequired),
+              m_rebootRequired(rebootRequired),
+              m_type(typeid(T)){};
+
+        ConfigField<T>& operator=(NvsField<T> const& in) {
+            this->m_data = in.m_data;
+            return *this;
+
+
+            //            if (this != &in) {
+            //                std::destroy_at(NvsField<T>::m_data);
+            //                std::construct_at(NvsField<T>::m_data, in);
+            //            }
+            //            return *this;
+        }
+
+        ConfigField() = delete;
+
+        ConfigField<T>& operator=(ConfigField<T> const& in) {
+            if (this != &in) {
+                std::destroy_at(this);
+                std::construct_at(this, in);
+            }
             return *this;
         }
 
-        const etl::string<NVS_NS_NAME_MAX_SIZE> key;
+        bool get_componentRestartRequired() const {
+            return m_componentRestartRequired;
+        }
 
-        const bool componentRestartRequired = false;
-        const bool rebootRequired           = false;
+        bool get_rebootRequired() const {
+            return m_rebootRequired;
+        }
+
+        ConfigKey get_key() const {
+            return m_key;
+        }
+
+        std::type_index get_type() const {
+            return m_type;
+        }
     };
 
+    template<size_t NUM_FIELDS>
     class ConfigObject {
     private:
+        etl::map<ConfigKey, void*, NUM_FIELDS> m_storedFields;
 
-        etl::vector<std::reference_wrapper<ConfigField</*ToDo: fix this*/>>, 50> m_storedFields;
     public:
-
         virtual constexpr std::string_view getKey() = 0;
 
         template<typename T>
-        void allocate(T& field) { m_storedFields };
+        ConfigField<T>& allocate(ConfigField<T>& field) {
+            m_storedFields[field.get_key()] = static_cast<void*>(&field);
+            return field;
+        };
 
+        void fromJson(nlohmann::json& data) {
+//            fileContets >> data;
 
+            for (auto& a : m_storedFields) {
+
+                static_cast<NvsField<std::any>>(a.second).m_data = data.at(a.first);
+            }
+
+        }
     };
 
-
-
-
-
-
     template<typename T>
-    NvsField<T> load(const etl::string<NVS_NS_NAME_MAX_SIZE>& key) {
-    }
+    NvsField<T> load(const ConfigKey key) {
+        return NvsField<T>{};
+    };
 
     template<typename T>
     void store(NvsField<T>) {
-    }
-
-    void functie2() {
-        ConfigField<int> test = {1, "fieldA"};
-        store(test);
-
-        test = ConfigField(load<int>(test.key));
-    }
-
-    enum Index {
-        SETTING1 = 0,
-        SETTING2 = 1
     };
 
-    void functie3() {
-        ConfigField<int> test  = {1, "fieldA"};
-        ConfigField<int> test1 = {1, "fieldA"};
-        std::array<std::reference_wrapper<std::any<ConfigField<int>, ConfigField<double>, ConfigField<etl::string<130>>>>, 5> {
-            { SETTING1, &test }
-        }
-    }
 
+    class RandomConfig : public ConfigObject<5> {
+        using Base = ConfigObject<5>;
 
-    class RandomConfig : public ConfigObject {
-        struct SubConfig {
-            ConfigField<int> fieldA;
+        inline static int test = 1;
+
+        ConfigField<int> fieldA {test, "fieldA"};
+
+        RandomConfig() :
+            fieldA(Base::allocate(fieldA)) {
+                fieldA = load<int>(fieldA.get_key());
         };
 
-        ConfigField<int>       fieldA = {1, "fieldA"};
-        ConfigField<SubConfig> fieldB = {{0, "fieldA"}, "fieldA"};
+//        static auto fieldB = allocate(ConfigField<SubConfig>{SubConfig, "fieldA"});
     };
+
+
 
     class ConfigProvider {
     private:
@@ -108,14 +145,14 @@ namespace sdk {
 
         static inline bool initialized = false;
 
-        const etl::string<NVS_NS_NAME_MAX_SIZE> nvsNamespace;
+        const ConfigKey nvsNamespace;
 
         const bool readOnly;
 
         std::unique_ptr<nvs::NVSHandle> handle;
 
     public:
-        ConfigProvider(const etl::string<NVS_NS_NAME_MAX_SIZE>& nvsNamespace, const bool readOnly = true) : nvsNamespace(nvsNamespace), readOnly(readOnly){};
+        ConfigProvider(const ConfigKey nvsNamespace, const bool readOnly = true) : nvsNamespace(nvsNamespace), readOnly(readOnly){};
 
         esp_err_t initialize() {
 
@@ -139,19 +176,19 @@ namespace sdk {
         }
 
         template<typename T>
-        esp_err_t getItemSize(const etl::string<NVS_NS_NAME_MAX_SIZE>& key, T& item, size_t& size) {
+        esp_err_t getItemSize(const ConfigKey key, T& item, size_t& size) {
             assert(handle != nullptr && "Call initialize() first");
             return handle->get_item_size(item, key.c_str(), size);
         }
 
         template<typename T>
-        esp_err_t loadItem(const etl::string<NVS_NS_NAME_MAX_SIZE>& key, T& item) {
+        esp_err_t loadItem(const ConfigKey key, T& item) {
             assert(handle != nullptr && "Call initialize() first");
             return handle->get_item(key.c_str(), item);
         }
 
         template<typename T>
-        esp_err_t saveItem(const etl::string<NVS_NS_NAME_MAX_SIZE>& key, T& item, bool commit = true) {
+        esp_err_t saveItem(const ConfigKey key, T& item, bool commit = true) {
             assert(handle != nullptr && "Call initialize() first");
             assert(!readOnly && "Unable to save if NVS is opened in READONLY mode");
             esp_err_t err = handle->set_item(key.c_str(), item);
