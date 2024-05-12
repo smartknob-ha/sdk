@@ -16,6 +16,21 @@
 #include "nvs_flash.h"
 #include "nvs_handle.hpp"
 
+// Serialize and deserialize etl::string
+namespace nlohmann {
+    template<std::size_t N>
+    struct adl_serializer<etl::string<N>> {
+        static void to_json(json& j, const etl::string<N>& str) {
+            j = std::string(str.begin(), str.end());
+        }
+
+        static void from_json(const json& j, etl::string<N>& str) {
+            std::string temp = j.get<std::string>();
+            str.assign(temp.begin(), temp.end());
+        }
+    };
+} // namespace nlohmann
+
 namespace sdk {
 
     using ConfigKey = etl::string<NVS_NS_NAME_MAX_SIZE>;
@@ -87,22 +102,22 @@ namespace sdk {
     private:
         static inline const char* TAG = "CONFIG";
 
-        static inline bool initialized = false;
+        static inline bool m_initialized = false;
 
-        const ConfigKey nvsNamespace;
+        const ConfigKey m_namespace;
 
-        const bool readOnly;
+        const bool m_readOnly;
 
         std::unique_ptr<nvs::NVSHandle> m_handle;
 
     public:
-        explicit ConfigProvider(const ConfigKey nvsNamespace, const bool readOnly = true) : nvsNamespace(nvsNamespace), readOnly(readOnly){};
+        explicit ConfigProvider(const ConfigKey nvsNamespace, const bool readOnly = true) : m_namespace(nvsNamespace), m_readOnly(readOnly){};
 
         std::error_code initialize() {
 
             esp_err_t err;
 
-            if (!initialized) {
+            if (!m_initialized) {
                 err = nvs_flash_init();
                 if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
                     // NVS partition was truncated and needs to be erased
@@ -111,11 +126,11 @@ namespace sdk {
                     err = nvs_flash_init();
                 }
                 ESP_ERROR_CHECK(err);
-                initialized = true;
+                m_initialized = true;
             }
-            nvs_open_mode_t nvsMode = readOnly ? NVS_READONLY : NVS_READWRITE;
+            nvs_open_mode_t nvsMode = m_readOnly ? NVS_READONLY : NVS_READWRITE;
 
-            m_handle = nvs::open_nvs_handle(nvsNamespace.c_str(), nvsMode, &err);
+            m_handle = nvs::open_nvs_handle(m_namespace.c_str(), nvsMode, &err);
             ESP_ERROR_CHECK_WITHOUT_ABORT(err);
             return std::make_error_code(err);
         }
@@ -130,6 +145,17 @@ namespace sdk {
         std::error_code getItemSize(const ConfigKey key, etl::string<LENGTH>& str, size_t& size) {
             assert(m_handle != nullptr && "Call initialize() first");
             return std::make_error_code(m_handle->get_item_size(nvs::ItemType::SZ, key.c_str(), size));
+        }
+
+        template<typename T>
+        std::error_code loadItem(const ConfigKey key, T& item) {
+            assert(m_handle != nullptr && "Call initialize() first");
+
+            auto err = std::make_error_code(m_handle->get_item(key.c_str(), item));
+            if (err) {
+                ESP_LOGE(TAG, "Error loading item: %s, err: %s", key.c_str(), err.message().c_str());
+            }
+            return err;
         }
 
         template<size_t LENGTH>
@@ -166,44 +192,42 @@ namespace sdk {
         }
 
         template<typename T>
-        std::error_code loadItem(const ConfigKey key, T& item) {
-            assert(m_handle != nullptr && "Call initialize() first");
-            return m_handle->get_item(key.c_str(), item);
-        }
-
-        template<typename T>
         std::error_code saveItem(const ConfigKey key, T& item, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to save if NVS is opened in READONLY mode");
-            esp_err_t err = m_handle->set_item(key.c_str(), item);
-            if (err != ESP_OK) {
-                return std::make_error_code(err);
+            assert(!m_readOnly && "Unable to save if NVS is opened in READONLY mode");
+            auto err = std::make_error_code(m_handle->set_item(key.c_str(), item));
+            if (err) {
+                ESP_LOGE(TAG, "Error saving item %s: %s", key.c_str(), err.message().c_str());
+                return err;
             }
             if (commit) {
                 return this->commit();
             }
-            return std::make_error_code(err);
+            return err;
         }
 
         template<size_t LENGTH>
         std::error_code saveItem(const ConfigKey key, const etl::string<LENGTH>& item, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to save if NVS is opened in READONLY mode");
-            esp_err_t err = m_handle->set_string(key.c_str(), item.c_str());
-            if (err != ESP_OK) {
-                return std::make_error_code(err);
+            assert(!m_readOnly && "Unable to save if NVS is opened in READONLY mode");
+            auto err = std::make_error_code(m_handle->set_string(key.c_str(), item.c_str()));
+            if (err) {
+                ESP_LOGE(TAG, "Error saving item %s: %s", key.c_str(), err.message().c_str());
+                return err;
             }
             if (commit) {
                 return this->commit();
             }
-            return std::make_error_code(err);
+            return err;
         }
 
         template<size_t BUFFER_SIZE>
-        std::error_code saveJson(const ConfigKey key, nlohmann::json& json, bool commit = true) {
+        std::error_code saveJson(const ConfigKey key, const nlohmann::json& json, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
+            assert(!m_readOnly && "Unable to save if NVS is opened in READONLY mode");
             etl::string<BUFFER_SIZE> buffer(json.dump().c_str());
-            auto                     err = std::make_error_code(m_handle->set_string(key.c_str(), buffer.c_str()));
+
+            auto err = std::make_error_code(m_handle->set_string(key.c_str(), buffer.c_str()));
             if (err) {
                 ESP_LOGE(TAG, "Error saving json %s: %s", key.c_str(), err.message().c_str());
                 return err;
@@ -216,26 +240,31 @@ namespace sdk {
 
         std::error_code eraseItem(const etl::string<NVS_KEY_NAME_MAX_SIZE>& key, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to erase if NVS is opened in READONLY mode");
-            auto err = m_handle->erase_item(key.c_str());
-            if (err != ESP_OK) {
-                return std::make_error_code(err);
+            assert(!m_readOnly && "Unable to erase if NVS is opened in READONLY mode");
+            auto err = std::make_error_code(m_handle->erase_item(key.c_str()));
+            if (err) {
+                ESP_LOGE(TAG, "Error erasing item %s: %s", key.c_str(), err.message().c_str());
+                return err;
             }
             if (commit) {
-                return std::make_error_code(m_handle->commit());
+                return this->commit();
             }
-            return std::make_error_code(err);
+            return err;
         }
 
         std::error_code erase() {
             assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to erase if NVS is opened in READONLY mode");
-            return std::make_error_code(m_handle->erase_all());
+            assert(!m_readOnly && "Unable to erase if NVS is opened in READONLY mode");
+            auto err = std::make_error_code(m_handle->erase_all());
+            if (err) {
+                ESP_LOGE(TAG, "Error erasing namespace %s: %s", m_namespace.c_str(), err.message().c_str());
+            }
+            return err;
         }
 
         std::error_code commit() {
             assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to commit if NVS is opened in READONLY mode");
+            assert(!m_readOnly && "Unable to commit if NVS is opened in READONLY mode");
             auto err = std::make_error_code(m_handle->commit());
             if (err) {
                 ESP_LOGE(TAG, "Error committing changes: %s", err.message().c_str());
@@ -330,7 +359,7 @@ namespace sdk {
             return err;
         }
 
-        RestartType checkForRestartRequired(nlohmann::json& json) {
+        RestartType checkForRestartRequired(const nlohmann::json& json) {
             auto temp = RestartType::NONE;
             for (const auto& object: json.items()) {
                 auto element = m_restartRequiredMap.find(hash(object.key().c_str()));
