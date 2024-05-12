@@ -382,6 +382,11 @@ namespace sdk {
         // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
         char m_buffer[BUFFER_SIZE]{0};
 
+        // Map to store the restart required status of each field
+        etl::unordered_map<size_t, RestartType, NUM_ITEMS> m_restartRequiredMap{};
+
+        nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(m_buffer);
+
         /**
          * @brief Retrieves itself from NVS
          * @return Error code of type esp_err_t
@@ -408,11 +413,6 @@ namespace sdk {
         }
 
     public:
-        // Map to store the restart required status of each field
-        etl::unordered_map<size_t, RestartType, NUM_ITEMS> m_restartRequiredMap{};
-
-        nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(m_buffer);
-
         /**
          * @brief Constructor to be used for incoming config changes
          * @param data Json object containing changes. Should only contain the fields that need to be updated
