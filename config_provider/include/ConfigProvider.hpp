@@ -2,7 +2,6 @@
 #define CONFIG_PROVIDER_HPP
 
 #include <esp_log.h>
-#include <etl/map.h>
 #include <etl/string.h>
 #include <nlohmann/json.hpp>
 
@@ -11,15 +10,15 @@
 #include <typeindex>
 
 #include "esp_err.h"
+#include "esp_system_error.hpp"
+#include "etl/unordered_map.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "nvs_handle.hpp"
 
-// todo fix
 namespace sdk {
 
     using ConfigKey = etl::string<NVS_NS_NAME_MAX_SIZE>;
-    //    using ConfigKey = etl::string<NVS_NS_NAME_MAX_SIZE>;
 
     enum class RestartType {
         NONE,
@@ -28,7 +27,7 @@ namespace sdk {
     };
 
     template<typename T>
-    struct ConfigField {
+    class ConfigField {
     private:
         const ConfigKey m_key;
 
@@ -59,85 +58,28 @@ namespace sdk {
             return m_value;
         };
 
-        RestartType restartType() const {
+        [[nodiscard]] RestartType restartType() const {
             return m_restartType;
         }
 
-        bool componentRestartRequired() const {
+        [[nodiscard]] bool componentRestartRequired() const {
             return m_restartType == RestartType::COMPONENT;
         }
 
-        bool rebootRequired() const {
+        [[nodiscard]] bool rebootRequired() const {
             return m_restartType == RestartType::DEVICE;
         }
 
-        ConfigKey key() const {
+        [[nodiscard]] ConfigKey key() const {
             return m_key;
         }
 
-        std::type_index type() const {
+        [[nodiscard]] std::type_index type() const {
             return m_type;
         }
-    };
 
-    template<size_t BUFFER_SIZE = 1024>
-    class ConfigObject {
-    private:
-        char            buffer[BUFFER_SIZE]{0};
-        nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(buffer);
-
-    public:
-        virtual constexpr std::string_view getKey() = 0;
-
-        explicit ConfigObject(nlohmann::json& data) {
-                std::copy(data.begin(), data.end(), m_json->begin());
-        };
-
-        template<typename T>
-        ConfigField<T> allocate(ConfigField<T>& field) {
-            if (!m_json->contains(field.key().c_str())) {
-                assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
-                m_json->at(field.key().c_str()) = field.value();
-
-                // ConfigField is immutable, so return a new object
-                return ConfigField<T>{field.value(), field.key(), field.restartType()};
-            } else {
-                return get(field);
-            }
-        };
-
-        void updateConfig(nlohmann::json& json) {
-            for (auto field = json.begin(); field != json.end(); ++field) {
-                m_json->at(field.key()) = field.value();
-            }
-        }
-
-        /**
-         * @brief Gets value for field from internal json buffer
-         * @tparam  T Type of ConfigField
-         * @param   field Fully initialised ConfigField with default value
-         * @return  New ConfigField<T> with value from ConfigObject json storage
-         * @warning If the field is not present yet the returned ConfigField will have
-         *          an identical value to the input ConfigField
-         */
-        template<typename T>
-        ConfigField<T> get(ConfigField<T>& field) {
-            T retrieved_value = m_json->value(field.key().c_str(), field.value());
-            return ConfigField<T>{retrieved_value, field.key(), field.restartType()};
-        }
-
-        template<typename T>
-        std::error_code put(ConfigKey& key, T& value) {
-        }
-    };
-
-    class RandomConfig : public ConfigObject<500> {
-        using Base = ConfigObject<500>;
-
-        ConfigField<int> fieldA{1, "fieldA", RestartType::NONE};
-
-        explicit RandomConfig(nlohmann::json& data) : Base(data) {
-            fieldA = allocate(fieldA);
+        operator T() const {
+            return m_value;
         }
     };
 
@@ -156,7 +98,7 @@ namespace sdk {
     public:
         explicit ConfigProvider(const ConfigKey nvsNamespace, const bool readOnly = true) : nvsNamespace(nvsNamespace), readOnly(readOnly){};
 
-        esp_err_t initialize() {
+        std::error_code initialize() {
 
             esp_err_t err;
 
@@ -174,114 +116,247 @@ namespace sdk {
             nvs_open_mode_t nvsMode = readOnly ? NVS_READONLY : NVS_READWRITE;
 
             m_handle = nvs::open_nvs_handle(nvsNamespace.c_str(), nvsMode, &err);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+            return std::make_error_code(err);
+        }
+
+        template<typename T>
+        std::error_code getItemSize(const ConfigKey key, T& item, size_t& size) {
+            assert(m_handle != nullptr && "Call initialize() first");
+            return std::make_error_code(m_handle->get_item_size(item, key.c_str(), size));
+        }
+
+        template<size_t LENGTH>
+        std::error_code getItemSize(const ConfigKey key, etl::string<LENGTH>& str, size_t& size) {
+            assert(m_handle != nullptr && "Call initialize() first");
+            return std::make_error_code(m_handle->get_item_size(nvs::ItemType::SZ, key.c_str(), size));
+        }
+
+        template<size_t LENGTH>
+        std::error_code loadItem(const ConfigKey key, etl::string<LENGTH>& item) {
+            assert(m_handle != nullptr && "Call initialize() first");
+            size_t required_size = 0;
+
+            auto err = getItemSize(key, item, required_size);
+            if (err) {
+                return err;
+            }
+            assert(LENGTH >= required_size && "LENGTH too small");
+            char buffer[LENGTH];
+            err = std::make_error_code(m_handle->get_string(key.c_str(), &buffer[0], required_size));
+            if (err) {
+                ESP_LOGE(TAG, "Error loading item: %s, err: %s", key.c_str(), err.message().c_str());
+            } else {
+                item.assign(buffer);
+            }
+            return err;
+        }
+
+        template<size_t BUFFER_SIZE>
+        std::error_code loadJson(const ConfigKey key, nlohmann::json& item) {
+            assert(m_handle != nullptr && "Call initialize() first");
+            etl::string<BUFFER_SIZE> buffer;
+
+            auto err = loadItem(key, buffer);
+            if (err) {
+                return err;
+            }
+            item = nlohmann::json::parse(buffer);
             return err;
         }
 
         template<typename T>
-        esp_err_t getItemSize(const ConfigKey key, T& item, size_t& size) {
-            assert(m_handle != nullptr && "Call initialize() first");
-            return m_handle->get_item_size(item, key.c_str(), size);
-        }
-
-        template<typename T>
-        esp_err_t loadItem(const ConfigKey key, T& item) {
+        std::error_code loadItem(const ConfigKey key, T& item) {
             assert(m_handle != nullptr && "Call initialize() first");
             return m_handle->get_item(key.c_str(), item);
         }
 
         template<typename T>
-        esp_err_t saveItem(const ConfigKey key, T& item, bool commit = true) {
+        std::error_code saveItem(const ConfigKey key, T& item, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!readOnly && "Unable to save if NVS is opened in READONLY mode");
             esp_err_t err = m_handle->set_item(key.c_str(), item);
             if (err != ESP_OK) {
-                return err;
+                return std::make_error_code(err);
             }
             if (commit) {
                 return this->commit();
             }
-            return err;
+            return std::make_error_code(err);
         }
 
-        template<size_t BUFFER_SIZE = 1024>
-        esp_err_t loadJSON(ConfigKey key, nlohmann::json& json) {
-            etl::string<BUFFER_SIZE> buffer;
-            auto err = loadItem(key, buffer);
-            if (err != ESP_OK) {
-                return err;
-            }
-
-            if (nlohmann::json::accept(buffer.c_str())) {
-                json = nlohmann::json::parse(buffer.c_str(), nullptr, false);
-            } else {
-                return ESP_ERR_INVALID_ARG;
-            }
-        }
-
-        template<size_t BUFFER_SIZE = 1024>
-        esp_err_t saveJSON(ConfigKey key, nlohmann::json& json) {
-            etl::string<BUFFER_SIZE> buffer(json.dump());
-            auto err = saveItem(key, buffer.c_str());
-        }
-
-        template<typename T>
-        esp_err_t saveConfig(T& config, bool commit = true) {
+        template<size_t LENGTH>
+        std::error_code saveItem(const ConfigKey key, const etl::string<LENGTH>& item, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!readOnly && "Unable to save if NVS is opened in READONLY mode");
-            static_assert(std::is_convertible<T*, ConfigObject*>::value, "Config object must inherit sdk::ConfigObject as public");
-
-            esp_err_t err = m_handle->set_blob(config.getKey().data(), static_cast<const void*>(&config), sizeof(config));
+            esp_err_t err = m_handle->set_string(key.c_str(), item.c_str());
             if (err != ESP_OK) {
+                return std::make_error_code(err);
+            }
+            if (commit) {
+                return this->commit();
+            }
+            return std::make_error_code(err);
+        }
+
+        template<size_t BUFFER_SIZE>
+        std::error_code saveJson(const ConfigKey key, nlohmann::json& json, bool commit = true) {
+            assert(m_handle != nullptr && "Call initialize() first");
+            etl::string<BUFFER_SIZE> buffer(json.dump().c_str());
+            auto                     err = std::make_error_code(m_handle->set_string(key.c_str(), buffer.c_str()));
+            if (err) {
+                ESP_LOGE(TAG, "Error saving json %s: %s", key.c_str(), err.message().c_str());
                 return err;
             }
-            ESP_LOGD(TAG, "Saved config: %s with size %d", config.getKey().data(), sizeof(config));
             if (commit) {
                 return this->commit();
             }
             return err;
         }
 
-        template<typename T>
-        esp_err_t loadConfig(T& config) {
-            assert(m_handle != nullptr && "Call initialize() first");
-            static_assert(std::is_convertible<T*, ConfigObject*>::value, "Config object must inherit sdk::ConfigObject as public");
-
-            size_t storedConfigSize = 0;
-
-            esp_err_t err = m_handle->get_item_size(nvs::ItemType::BLOB, config.getKey().data(), storedConfigSize);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Error retrieving size for %s: %s", config.getKey().data(), esp_err_to_name(err));
-                return err;
-            }
-            assert(!(sizeof(T) < storedConfigSize) && "Removing struct members is illegal");
-            return m_handle->get_blob(config.getKey().data(), static_cast<void*>(&config), storedConfigSize);
-        }
-
-        esp_err_t eraseItem(const etl::string<NVS_KEY_NAME_MAX_SIZE>& key, bool commit = true) {
+        std::error_code eraseItem(const etl::string<NVS_KEY_NAME_MAX_SIZE>& key, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!readOnly && "Unable to erase if NVS is opened in READONLY mode");
             auto err = m_handle->erase_item(key.c_str());
             if (err != ESP_OK) {
-                return err;
+                return std::make_error_code(err);
             }
             if (commit) {
-                return m_handle->commit();
+                return std::make_error_code(m_handle->commit());
+            }
+            return std::make_error_code(err);
+        }
+
+        std::error_code erase() {
+            assert(m_handle != nullptr && "Call initialize() first");
+            assert(!readOnly && "Unable to erase if NVS is opened in READONLY mode");
+            return std::make_error_code(m_handle->erase_all());
+        }
+
+        std::error_code commit() {
+            assert(m_handle != nullptr && "Call initialize() first");
+            assert(!readOnly && "Unable to commit if NVS is opened in READONLY mode");
+            auto err = std::make_error_code(m_handle->commit());
+            if (err) {
+                ESP_LOGE(TAG, "Error committing changes: %s", err.message().c_str());
+            }
+            return err;
+        }
+    };
+
+    template<size_t N>
+    struct StringLiteral {
+        constexpr StringLiteral(const char (&str)[N]) {
+            std::copy_n(str, N, value);
+        }
+
+        char value[N];
+
+        operator const char*() const {
+            return value[0];
+        }
+
+        operator char*() const {
+            return value[0];
+        }
+
+        const char* c_str() const {
+            return value;
+        }
+    };
+
+    template<size_t NUM_ITEMS, size_t BUFFER_SIZE, StringLiteral KEY>
+    class ConfigObject {
+    private:
+        char m_buffer[BUFFER_SIZE]{0};
+
+        std::error_code load() {
+            ConfigProvider provider("config", true);
+            auto           err = provider.initialize();
+            if (err) {
+                ESP_LOGE(KEY.c_str(), "Error initializing config: %s", err.message().c_str());
+                return err;
+            }
+            err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json);
+            return err;
+        }
+
+        size_t hash(ConfigKey key) {
+            etl::hash<etl::string<NVS_KEY_NAME_MAX_SIZE>> hasher;
+            return hasher(key);
+        }
+
+    public:
+        etl::unordered_map<size_t, RestartType, NUM_ITEMS> m_restartRequiredMap{};
+
+        nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(m_buffer);
+
+        explicit ConfigObject(nlohmann::json& data) {
+            for (const auto& object: data.items()) {
+                (*m_json)[object.key()] = object.value();
+            }
+        };
+
+        ConfigObject() {
+            load();
+        }
+
+        template<typename T>
+        ConfigField<T> allocate(ConfigField<T>& field) {
+            m_restartRequiredMap[hash(field.key())] = field.restartType();
+
+            if (!m_json->contains(field.key().c_str())) {
+                assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
+                m_json->emplace(field.key().c_str(), field.value());
+
+                // ConfigField is immutable, so return a new object
+                return ConfigField<T>{field.value(), field.key(), field.restartType()};
+            } else {
+                T retrieved_value = m_json->value(static_cast<const char*>(field.key().c_str()), field.value());
+                return ConfigField<T>{retrieved_value, field.key(), field.restartType()};
+            }
+        };
+
+        std::error_code save() {
+            ConfigProvider provider("config", false);
+            auto           err = provider.initialize();
+            if (err) {
+                return err;
+            }
+            err = provider.saveJson<BUFFER_SIZE>(KEY.c_str(), *m_json, true);
+            if (err) {
+                ESP_LOGE(KEY.c_str(), "Error saving config: %s", err.message().c_str());
             }
             return err;
         }
 
-        esp_err_t erase() {
-            assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to erase if NVS is opened in READONLY mode");
-            return m_handle->erase_all();
+        RestartType checkForRestartRequired(nlohmann::json& json) {
+            auto temp = RestartType::NONE;
+            for (const auto& object: json.items()) {
+                auto element = m_restartRequiredMap.find(hash(object.key().c_str()));
+                if (element == m_restartRequiredMap.end()) {
+                    ESP_LOGD(KEY.c_str(), "No restart required found for %s", object.key().c_str());
+                    continue;
+                }
+                // If device restart is found, nothing else matters
+                if (element->second == sdk::RestartType::COMPONENT) {
+                    temp = sdk::RestartType::COMPONENT;
+                } else if (element->second == sdk::RestartType::DEVICE) {
+                    return sdk::RestartType::DEVICE;
+                }
+            }
+            return temp;
         }
-        esp_err_t commit() {
-            assert(m_handle != nullptr && "Call initialize() first");
-            assert(!readOnly && "Unable to commit if NVS is opened in READONLY mode");
-            return m_handle->commit();
+
+        RestartType checkForRestartRequired(etl::string<NVS_KEY_NAME_MAX_SIZE>& key) {
+            auto element = m_restartRequiredMap.find(hash(key));
+            if (element == m_restartRequiredMap.end()) {
+                ESP_LOGD(KEY.c_str(), "No restart required found for %s", key.c_str());
+                RestartType::NONE;
+            }
+            return element->second;
         }
     };
-
 } // namespace sdk
 
 #endif // CONFIG_PROVIDER_HPP
