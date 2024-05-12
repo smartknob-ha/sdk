@@ -501,7 +501,7 @@ namespace sdk {
             auto element = m_restartRequiredMap.find(hash(key));
             if (element == m_restartRequiredMap.end()) {
                 ESP_LOGD(KEY.c_str(), "No restart required found for %s", key.c_str());
-                RestartType::NONE;
+                return RestartType::NONE;
             }
             return element->second;
         }
