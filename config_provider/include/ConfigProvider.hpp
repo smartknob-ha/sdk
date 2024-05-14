@@ -531,6 +531,21 @@ namespace sdk {
         const semver::version updatedOn() const {
             return m_updatedOn;
         }
+
+        /**
+         * @brief Get the size of the json string stored in NVS
+         * @return Size of the json string stored in NVS. Returns 0 if the entry does not exist
+         */
+        static size_t getStoredSize() {
+            ConfigProvider provider(CONFIG_NAMESPACE, false);
+            auto           err = provider.initialize();
+            if (err) {
+                return 0;
+            }
+            size_t size = 0;
+            provider.getStringSize(KEY.c_str(), size);
+            return size;
+        }
     };
 } // namespace sdk
 
