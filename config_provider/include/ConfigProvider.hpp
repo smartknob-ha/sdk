@@ -19,7 +19,7 @@
 #include "semantic_versioning.hpp"
 
 #define CONFIG_NAMESPACE "config"
-#define UPDATED_ON_KEY "updatedOn"
+#define CONFIG_VERSION_KEY "version"
 
 // Serialize and deserialize etl::string
 namespace nlohmann {
@@ -384,7 +384,7 @@ namespace sdk {
         // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
         char m_buffer[BUFFER_SIZE]{0};
 
-        semver::version m_updatedOn;
+        semver::version m_version;
 
         // Map to store the restart required status of each field
         etl::unordered_map<size_t, RestartType, NUM_ITEMS> m_restartRequiredMap{};
@@ -404,12 +404,12 @@ namespace sdk {
             }
             err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json);
 
-            // If the updatedOn field is not found, set it to the current version
-            if (!err && m_json->contains(UPDATED_ON_KEY)) {
-                m_updatedOn = semver::from_string(m_json->at(UPDATED_ON_KEY).get<std::string>());
+            // If the version field is not found, set it to the current version
+            if (!err && m_json->contains(CONFIG_VERSION_KEY)) {
+                m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
             } else {
                 auto app_desc = esp_app_get_description();
-                m_updatedOn   = semver::from_string(app_desc->version);
+                m_version = semver::from_string(app_desc->version);
             }
             return err;
         }
@@ -471,10 +471,10 @@ namespace sdk {
         std::error_code save() {
             ConfigProvider provider(CONFIG_NAMESPACE, false);
 
-            // Update the updatedOn field to the current version
+            // Update the version field to the current version
             auto app_desc              = esp_app_get_description();
-            m_json->at(UPDATED_ON_KEY) = app_desc->version;
-            m_updatedOn                = semver::from_string(app_desc->version);
+            m_json->at(CONFIG_VERSION_KEY) = app_desc->version;
+            m_version                  = semver::from_string(app_desc->version);
 
             auto err = provider.initialize();
             if (err) {
@@ -528,8 +528,8 @@ namespace sdk {
          * @brief Get the firmware version the config was last updated on
          * @return Version the config was last updated on
          */
-        const semver::version updatedOn() const {
-            return m_updatedOn;
+        const semver::version version() const {
+            return m_version;
         }
 
         /**
