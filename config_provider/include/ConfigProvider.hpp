@@ -9,12 +9,17 @@
 #include <cstring>
 #include <typeindex>
 
+#include "esp_app_desc.h"
 #include "esp_err.h"
 #include "esp_system_error.hpp"
 #include "etl/unordered_map.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "nvs_handle.hpp"
+#include "semantic_versioning.hpp"
+
+#define CONFIG_NAMESPACE "config"
+#define CONFIG_VERSION_KEY "version"
 
 // Serialize and deserialize etl::string
 namespace nlohmann {
@@ -48,7 +53,7 @@ namespace sdk {
         std::unique_ptr<nvs::NVSHandle> m_handle;
 
     public:
-        explicit ConfigProvider(const ConfigKey nvsNamespace, const bool readOnly = true) : m_namespace(nvsNamespace), m_readOnly(readOnly){};
+        explicit ConfigProvider(const ConfigKey& nvsNamespace, const bool readOnly = true) : m_namespace(nvsNamespace), m_readOnly(readOnly){};
 
         /**
          * @brief Initialize the NVS handle, call this before any other function
@@ -93,15 +98,12 @@ namespace sdk {
         }
 
         /**
-         * @brief Get the size of an etl::string in NVS
-         * @tparam LENGTH Length of the string
+         * @brief Get the size of a string in NVS
          * @param key Key of the nvs entry, max length is NVS_KEY_NAME_MAX_SIZE
-         * @param string Unused, just to match the original function signature
          * @param size Place to store the size of the item
          * @return Error code of type esp_err_t, will be ESP_ERR_NVS_NOT_FOUND if the entry does not exist
          */
-        template<size_t LENGTH>
-        std::error_code getItemSize(const ConfigKey key, etl::string<LENGTH>& string, size_t& size) {
+        std::error_code getStringSize(const ConfigKey key, size_t& size) {
             assert(m_handle != nullptr && "Call initialize() first");
             return std::make_error_code(m_handle->get_item_size(nvs::ItemType::SZ, key.c_str(), size));
         }
@@ -136,7 +138,7 @@ namespace sdk {
             assert(m_handle != nullptr && "Call initialize() first");
             size_t storedSize = 0;
 
-            auto err = getItemSize(key, string, storedSize);
+            auto err = getStringSize(key, storedSize);
             if (err) {
                 return err;
             }
@@ -382,6 +384,8 @@ namespace sdk {
         // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
         char m_buffer[BUFFER_SIZE]{0};
 
+        semver::version m_version;
+
         // Map to store the restart required status of each field
         etl::unordered_map<size_t, RestartType, NUM_ITEMS> m_restartRequiredMap{};
 
@@ -392,13 +396,21 @@ namespace sdk {
          * @return Error code of type esp_err_t
          */
         std::error_code load() {
-            ConfigProvider provider("config", true);
+            ConfigProvider provider(CONFIG_NAMESPACE, true);
             auto           err = provider.initialize();
             if (err) {
                 ESP_LOGE(KEY.c_str(), "Error initializing config: %s", err.message().c_str());
                 return err;
             }
             err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json);
+
+            // If the version field is not found, set it to the current version
+            if (!err && m_json->contains(CONFIG_VERSION_KEY)) {
+                m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
+            } else {
+                auto app_desc = esp_app_get_description();
+                m_version = semver::from_string(app_desc->version);
+            }
             return err;
         }
 
@@ -457,8 +469,14 @@ namespace sdk {
          * @return Error code of type esp_err_t
          */
         std::error_code save() {
-            ConfigProvider provider("config", false);
-            auto           err = provider.initialize();
+            ConfigProvider provider(CONFIG_NAMESPACE, false);
+
+            // Update the version field to the current version
+            auto app_desc              = esp_app_get_description();
+            m_json->at(CONFIG_VERSION_KEY) = app_desc->version;
+            m_version                  = semver::from_string(app_desc->version);
+
+            auto err = provider.initialize();
             if (err) {
                 return err;
             }
@@ -504,6 +522,29 @@ namespace sdk {
                 return RestartType::NONE;
             }
             return element->second;
+        }
+
+        /**
+         * @brief Get the firmware version the config was last updated on
+         * @return Version the config was last updated on
+         */
+        const semver::version version() const {
+            return m_version;
+        }
+
+        /**
+         * @brief Get the size of the json string stored in NVS
+         * @return Size of the json string stored in NVS. Returns 0 if the entry does not exist
+         */
+        static size_t getStoredSize() {
+            ConfigProvider provider(CONFIG_NAMESPACE, false);
+            auto           err = provider.initialize();
+            if (err) {
+                return 0;
+            }
+            size_t size = 0;
+            provider.getStringSize(KEY.c_str(), size);
+            return size;
         }
     };
 } // namespace sdk
