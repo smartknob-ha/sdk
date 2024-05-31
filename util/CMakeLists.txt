@@ -1,1 +1,1 @@
-idf_component_register( INCLUDE_DIRS "include")
+idf_component_register( SRCS "source/esp_system_error.cpp" INCLUDE_DIRS "include")
