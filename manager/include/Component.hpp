@@ -6,6 +6,8 @@
 #include <freertos/queue.h>
 #include <result.h>
 
+#include <expected>
+
 #include "esp_err.h"
 
 namespace sdk {
@@ -32,26 +34,7 @@ namespace sdk {
         DEINITIALIZED
     };
 
-    using res = Result<ComponentStatus, etl::string<128>>;
-#define ERR_MSG(espError, errorMsg)                                                                         \
-    do {                                                                                                    \
-        Err(etl::string<128>(etl::string<128>(errorMsg).substr(0, 104).append(esp_err_to_name(espError)))); \
-    } while (0)
-
-#define ERR(espError)                                     \
-    do {                                                  \
-        Err(etl::string<128>(esp_err_to_name(espError))); \
-    } while (0)
-
-#define RETURN_ON_ERR_MSG(espError, errorMsg)                                                                      \
-    do {                                                                                                           \
-        return Err(etl::string<128>(etl::string<128>(errorMsg).substr(0, 104).append(esp_err_to_name(espError)))); \
-    } while (0)
-
-#define RETURN_ON_ERR(espError)                                  \
-    do {                                                         \
-        return Err(etl::string<128>(esp_err_to_name(espError))); \
-    } while (0)
+    using res = std::expected<ComponentStatus, std::error_code>;
 
     template<UBaseType_t LEN, typename QUEUETYPE, TickType_t ENQUEUE_TIMEOUT>
     class HasQueue {
@@ -108,7 +91,7 @@ namespace sdk {
         /**
          * @brief Gets called by the manager before startup
          */
-        virtual res initialize() { return Ok(ComponentStatus::UNINITIALIZED); };
+        virtual res initialize() { return ComponentStatus::UNINITIALIZED; };
 
         /**
          * @brief Gets called by the manager in its' main loop
@@ -117,7 +100,7 @@ namespace sdk {
          *          the component by calling stop(), initialize()
          *          and run().
          */
-        virtual res run() { return Ok(ComponentStatus::UNINITIALIZED); };
+        virtual res run() { return ComponentStatus::UNINITIALIZED; };
 
 
         /**

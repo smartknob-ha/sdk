@@ -6,17 +6,21 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_system.h"
+#include "esp_system_error.hpp"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
-#include "freertos/task.h"
-#include "lwip/err.h"
-#include "lwip/sockets.h"
-#include "lwip/sys.h"
-#include "nvs_flash.h"
 
 #define STA_CONNECTED_BIT BIT0
 #define STA_DISCONNECTED_BIT BIT1
+
+#define INIT_RETURN_ON_ERROR(err)                                           \
+    do {                                                                    \
+        if (err != ESP_OK) {                                                \
+            ESP_LOGE(TAG, "Failed to init STA: %s", esp_err_to_name(err)); \
+            return std::unexpected(std::make_error_code(err));              \
+        }                                                                   \
+    } while (0)
 
 namespace sdk {
     namespace wifi {
@@ -26,28 +30,38 @@ namespace sdk {
         }
 
         res Station::getStatus() {
-            return Ok(ComponentStatus::RUNNING);
+            return ComponentStatus::RUNNING;
         }
 
         res Station::run() {
-            return Ok(ComponentStatus::RUNNING);
+            return ComponentStatus::RUNNING;
         }
 
         res Station::stop() {
-            wifi_mode_t currentMode  = WIFI_MODE_NULL;
-            esp_err_t   err          = esp_wifi_get_mode(&currentMode);
-            if (err == ESP_ERR_WIFI_NOT_INIT)
-                ESP_LOGW(TAG, "Wifi is not running, returning");
-            else if (err == ESP_OK && currentMode == WIFI_MODE_STA) {
-                RETURN_ON_ERR_MSG(esp_wifi_stop(), "esp_wifi_stop: ");
-            } else if (err == ESP_OK && currentMode == WIFI_MODE_APSTA)
-                RETURN_ON_ERR_MSG(esp_wifi_set_mode(WIFI_MODE_AP), "esp_wifi_set_mode: ");
-            return Ok(ComponentStatus::STOPPED);
+            wifi_mode_t currentMode = WIFI_MODE_NULL;
+            esp_err_t   err         = esp_wifi_get_mode(&currentMode);
+            if (err == ESP_ERR_WIFI_NOT_INIT) {
+                ESP_LOGD(TAG, "Wifi is not running, returning");
+            } else if (err == ESP_OK && currentMode == WIFI_MODE_STA) {
+                err = esp_wifi_stop();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to stop STA: %s", esp_err_to_name(err));
+                    return std::unexpected(std::make_error_code(err));
+                }
+            } else if (err == ESP_OK && currentMode == WIFI_MODE_APSTA) {
+                ESP_LOGD(TAG, "Wifi is in APSTA mode, stopping STA only");
+                err = esp_wifi_set_mode(WIFI_MODE_AP);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to set wifi mode to AP: %s", esp_err_to_name(err));
+                    return std::unexpected(std::make_error_code(err));
+                }
+            }
+            return ComponentStatus::STOPPED;
         }
 
         res Station::initialize() {
             auto ret = initializeNonBlocking();
-            if (ret.isErr())
+            if (!ret.has_value())
                 return ret;
 
             // Wait for one of the bits to be set by the event handler
@@ -57,12 +71,15 @@ namespace sdk {
                                                    pdFALSE,
                                                    30000 / portTICK_PERIOD_MS); // 30 seconds
 
-            if (bits == STA_DISCONNECTED_BIT)
-                return Err(etl::string<128>("STA Disconnected"));
-            else if (bits == STA_CONNECTED_BIT)
-                return Ok(ComponentStatus::RUNNING);
-            else
-                return Err(etl::string<128>("Wifi connection timed out after 30 seconds"));
+            if (bits == STA_CONNECTED_BIT) {
+                return ComponentStatus::RUNNING;
+            } else if (bits == STA_DISCONNECTED_BIT) {
+                ESP_LOGE(TAG, "Failed to connect to wifi");
+                return std::unexpected(std::make_error_code(ESP_ERR_WIFI_NOT_CONNECT));
+            } else {
+                ESP_LOGE(TAG, "Wifi connection timed out after 30 seconds");
+                return std::unexpected(std::make_error_code(ESP_ERR_WIFI_TIMEOUT));
+            }
         }
 
         res Station::initializeNonBlocking() {
@@ -70,7 +87,7 @@ namespace sdk {
             esp_err_t   err = esp_wifi_get_mode(&current_mode);
             if (err == ESP_OK && current_mode == WIFI_MODE_STA) {
                 m_wifiInitialized = true;
-                return Err(etl::string<128>("Wifi STA is already initialized, returning"));
+                return sdk::ComponentStatus::RUNNING;
             } else if (err == ESP_OK && current_mode == WIFI_MODE_AP) {
                 ESP_LOGW(TAG, "Wifi already initialized as AP, attempting to add Soft STA");
                 new_mode          = WIFI_MODE_APSTA;
@@ -80,9 +97,9 @@ namespace sdk {
                 ESP_LOGI(TAG, "Initializing wifi STA");
                 // Don't care about return value as it either initializes, or it's already initialized
                 esp_netif_init();
-                RETURN_ON_ERR_MSG(esp_event_loop_create_default(), "esp_event_loop_create_default");
+                INIT_RETURN_ON_ERROR(esp_event_loop_create_default());
                 wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-                RETURN_ON_ERR_MSG(esp_wifi_init(&cfg), "esp_wifi_init: ");
+                INIT_RETURN_ON_ERROR(esp_wifi_init(&cfg));
             }
 
             esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
@@ -94,18 +111,16 @@ namespace sdk {
 
             esp_netif_set_hostname(m_networkInterface, m_config.hostname.c_str());
 
-            RETURN_ON_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT,
-                                                                  ESP_EVENT_ANY_ID,
-                                                                  &eventHandler,
-                                                                  NULL,
-                                                                  NULL),
-                              "esp_event_handler_instance_register: ");
-            RETURN_ON_ERR_MSG(esp_event_handler_instance_register(IP_EVENT,
-                                                                  IP_EVENT_STA_GOT_IP,
-                                                                  &eventHandler,
-                                                                  NULL,
-                                                                  NULL),
-                              "esp_event_handler_instance_register: ");
+            INIT_RETURN_ON_ERROR(esp_event_handler_instance_register(WIFI_EVENT,
+                                                                     ESP_EVENT_ANY_ID,
+                                                                     &eventHandler,
+                                                                     NULL,
+                                                                     NULL));
+            INIT_RETURN_ON_ERROR(esp_event_handler_instance_register(IP_EVENT,
+                                                                     IP_EVENT_STA_GOT_IP,
+                                                                     &eventHandler,
+                                                                     NULL,
+                                                                     NULL));
 
             wifi_config_t wifiConfig = {
                     .sta = {
@@ -116,22 +131,22 @@ namespace sdk {
             memcpy(wifiConfig.sta.ssid, m_config.ssid.data(), m_config.ssid.size());
             memcpy(wifiConfig.sta.password, m_config.pass.data(), m_config.pass.size());
 
-            RETURN_ON_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
-            RETURN_ON_ERR_MSG(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig), "esp_wifi_set_config: ");
+            INIT_RETURN_ON_ERROR(esp_wifi_set_mode(new_mode));
+            INIT_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
 
             if (!m_wifiInitialized) {
-                RETURN_ON_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
+                INIT_RETURN_ON_ERROR(esp_wifi_start());
                 m_wifiInitialized = true;
             }
-            RETURN_ON_ERR_MSG(esp_wifi_connect(), "esp_wifi_connect: ");
+            INIT_RETURN_ON_ERROR(esp_wifi_connect());
 
             ESP_LOGI(TAG, "Attempting to connect to: \"%s\"", wifiConfig.sta.ssid);
 
-            return Ok(ComponentStatus::RUNNING);
+            return ComponentStatus::RUNNING;
         }
 
         void Station::eventHandler(void* arg, esp_event_base_t eventBase,
-                                          int32_t eventId, void* eventData) {
+                                   int32_t eventId, void* eventData) {
             switch (eventId) {
                 case WIFI_EVENT_STA_START: {
                     ESP_LOGI(TAG, "STA has started");

@@ -1,20 +1,23 @@
 #include "AccessPoint.hpp"
 
-#include <etl/container.h>
-#include <etl/type_traits.h>
 #include <string.h>
 
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_system_error.hpp"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "lwip/err.h"
-#include "lwip/sys.h"
-#include "nvs_flash.h"
 
 #define AP_INITIALIZED_BIT BIT0
+
+#define INIT_RETURN_ON_ERROR(err)                                           \
+    do {                                                                    \
+        if (err != ESP_OK) {                                                \
+            ESP_LOGE(TAG, "Failed to init AP: %s", esp_err_to_name(err)); \
+            return std::unexpected(std::make_error_code(err));              \
+        }                                                                   \
+    } while (0)
 
 namespace sdk::wifi {
 
@@ -23,34 +26,45 @@ namespace sdk::wifi {
     }
 
     res AccessPoint::getStatus() {
-        return Ok(ComponentStatus::RUNNING);
+        return ComponentStatus::RUNNING;
     }
 
     res AccessPoint::run() {
-        return Ok(ComponentStatus::RUNNING);
+        return ComponentStatus::RUNNING;
     }
 
     res AccessPoint::stop() {
         wifi_mode_t currentMode = WIFI_MODE_NULL;
-
-        esp_err_t err = esp_wifi_get_mode(&currentMode);
-        if (err == ESP_ERR_WIFI_NOT_INIT)
-            ESP_LOGW(TAG, "Wifi is not running, returning");
-        else if (err == ESP_OK && currentMode == WIFI_MODE_AP) {
-            RETURN_ON_ERR_MSG(esp_wifi_stop(), "esp_wifi_stop: ");
-        } else if (err == ESP_OK && currentMode == WIFI_MODE_APSTA)
-            RETURN_ON_ERR_MSG(esp_wifi_set_mode(WIFI_MODE_STA), "esp_wifi_set_mode: ");
-        return Ok(ComponentStatus::STOPPED);
+        esp_err_t   err         = esp_wifi_get_mode(&currentMode);
+        if (err == ESP_ERR_WIFI_NOT_INIT) {
+            ESP_LOGD(TAG, "Wifi is not running, returning");
+        } else if (err == ESP_OK && currentMode == WIFI_MODE_STA) {
+            err = esp_wifi_stop();
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to stop wifi: %s", esp_err_to_name(err));
+                return std::unexpected(std::make_error_code(err));
+            }
+        } else if (err == ESP_OK && currentMode == WIFI_MODE_APSTA) {
+            ESP_LOGD(TAG, "Wifi is in APSTA mode, stopping AP only");
+            err = esp_wifi_set_mode(WIFI_MODE_STA);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set wifi mode to STA: %s", esp_err_to_name(err));
+                return std::unexpected(std::make_error_code(err));
+            }
+        }
+        return ComponentStatus::STOPPED;
     }
 
     res AccessPoint::initialize() {
         auto ret = initialize_non_blocking();
-        if (ret.isErr())
+        if (!ret.has_value()) {
+            ESP_LOGE(TAG, "Failed to initialize AP: %s", ret.error().message().c_str());
             return ret;
+        }
 
         // Wait for AP_INITIALIZED_BIT to be set by the event handler
         xEventGroupWaitBits(eventGroup, AP_INITIALIZED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
-        return Ok(ComponentStatus::RUNNING);
+        return ComponentStatus::RUNNING;
     }
 
     res AccessPoint::initialize_non_blocking() {
@@ -59,7 +73,7 @@ namespace sdk::wifi {
 
         if (err == ESP_OK && current_mode == WIFI_MODE_AP) {
             m_wifiInitialized = true;
-            return Err(etl::string<128>("Soft AP is already initialized, returning"));
+            return sdk::ComponentStatus::RUNNING;
         } else if (err == ESP_OK && current_mode == WIFI_MODE_STA) {
             ESP_LOGW(TAG, "Wifi already initialized as STA, attempting to add Soft AP");
             new_mode          = WIFI_MODE_APSTA;
@@ -69,14 +83,14 @@ namespace sdk::wifi {
         if (!m_wifiInitialized) {
             // Don't care about return value as it either initializes, or it's already initialized
             esp_netif_init();
-            RETURN_ON_ERR_MSG(esp_event_loop_create_default(), "esp_event_loop_create_default: ");
+            INIT_RETURN_ON_ERROR(esp_event_loop_create_default());
             wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-            RETURN_ON_ERR_MSG(esp_wifi_init(&cfg), "esp_wifi_init: ");
+            INIT_RETURN_ON_ERROR(esp_wifi_init(&cfg));
         }
 
         m_espNetif = esp_netif_create_default_wifi_ap();
 
-        RETURN_ON_ERR_MSG(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &eventHandler, NULL, NULL), "esp_event_handler_instance_register: ");
+        INIT_RETURN_ON_ERROR(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &eventHandler, NULL, NULL));
 
         wifi_config_t wifiConfig = {
                 .ap = {
@@ -88,16 +102,16 @@ namespace sdk::wifi {
         memcpy(wifiConfig.ap.ssid, m_config.ssid.data(), m_config.ssid.size());
         memcpy(wifiConfig.ap.password, m_config.pass.data(), m_config.pass.size());
 
-        RETURN_ON_ERR_MSG(esp_wifi_set_mode(new_mode), "esp_wifi_set_mode: ");
-        RETURN_ON_ERR_MSG(esp_wifi_set_config(WIFI_IF_AP, &wifiConfig), "esp_wifi_set_config: ");
+        INIT_RETURN_ON_ERROR(esp_wifi_set_mode(new_mode));
+        INIT_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &wifiConfig));
 
         if (!m_wifiInitialized) {
-            RETURN_ON_ERR_MSG(esp_wifi_start(), "esp_wifi_start: ");
+            INIT_RETURN_ON_ERROR(esp_wifi_start());
             m_wifiInitialized = true;
         }
 
         ESP_LOGD(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifiConfig.ap.ssid, wifiConfig.ap.password, wifiConfig.ap.channel);
-        return Ok(ComponentStatus::INITIALIZING);
+        return ComponentStatus::INITIALIZING;
     }
 
     void AccessPoint::eventHandler(void* arg, esp_event_base_t eventBase,

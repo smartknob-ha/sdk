@@ -1,6 +1,7 @@
 #include "../../manager/include/Manager.hpp"
 #include "MockComponent.hpp"
 #include "unity.h"
+#include "../../util/include/esp_system_error.hpp"
 
 sdk::Manager& m = sdk::Manager::instance();
 
@@ -39,11 +40,11 @@ void testComponentShouldBeRestartedAfterRunError() {
 
     // We need to be able to make sure a restart was done
     testComponent.set_initialize_return({.ok      = true,
-                                         .message = "",
+                                         .error = {},
                                          .called  = false});
 
     testComponent.set_run_return({.ok      = false,
-                                  .message = "forced error",
+                                  .error = std::make_error_code(ESP_FAIL),
                                   .called  = false});
 
     sleep(1);
@@ -51,7 +52,7 @@ void testComponentShouldBeRestartedAfterRunError() {
     while (!testComponent.run_called()) {}
 
     testComponent.set_run_return({.ok      = true,
-                                  .message = "",
+                                  .error = std::make_error_code(ESP_FAIL),
                                   .called  = false});
 
     sleep(1);
@@ -63,18 +64,18 @@ void testComponentShouldBeRestartedAfterRunError() {
 void testComponentShouldBeDisabledAfterStopError() {
     // Trigger call to restart_component
     testComponent.set_run_return({.ok      = false,
-                                  .message = "forced error",
+                                  .error = std::make_error_code(ESP_FAIL),
                                   .called  = false});
 
     testComponent.set_stop_return({.ok      = false,
-                                   .message = "forced error",
+                                   .error = std::make_error_code(ESP_FAIL),
                                    .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
     while (!testComponent.stop_called()) {}
 
     testComponent.set_run_return({.ok      = true,
-                                  .message = "",
+                                  .error = {},
                                   .called  = false});
 
     usleep(200);
@@ -87,7 +88,7 @@ void testComponentShouldBeDisabledAfterInitializeError() {
     sleep(1);
 
     testComponent.set_initialize_return({.ok      = false,
-                                         .message = "forced error",
+                                         .error = std::make_error_code(ESP_FAIL),
                                          .called  = false});
 
     m.start();
@@ -99,18 +100,18 @@ void testComponentShouldBeDisabledAfterInitializeError() {
 void testComponentShouldBeDisabledAfterInitializeErrorInRestart() {
     // Trigger call to restart_component
     testComponent.set_run_return({.ok      = false,
-                                  .message = "forced error",
+                                  .error = std::make_error_code(ESP_FAIL),
                                   .called  = false});
 
     testComponent.set_initialize_return({.ok      = false,
-                                         .message = "forced error",
+                                         .error = std::make_error_code(ESP_FAIL),
                                          .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
     while (!testComponent.stop_called()) {}
 
     testComponent.set_run_return({.ok      = true,
-                                  .message = "",
+                                  .error = {},
                                   .called  = false});
 
     sleep(1);
