@@ -22,7 +22,7 @@ namespace sdk {
     void Manager::start() {
         if (!m_running) {
             m_running = true;
-            xTaskCreate(startRun, "manager", 4096, this, 2, nullptr);
+            xTaskCreate(startRun, "manager", 4096, this, 1, nullptr);
         }
     }
 
