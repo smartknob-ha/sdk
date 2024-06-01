@@ -9,6 +9,7 @@ sdk::MockComponent testComponent;
 
 // Repeated for each test
 void setUp() {
+    testComponent.reset();
     m.start();
 }
 
@@ -62,14 +63,15 @@ void testComponentShouldBeRestartedAfterRunError() {
 }
 
 void testComponentShouldBeDisabledAfterStopError() {
+    // First setup stop error to prevent race condition
+    testComponent.set_stop_return({.ok      = false,
+                                   .error = std::make_error_code(ESP_FAIL),
+                                   .called  = false});
+
     // Trigger call to restart_component
     testComponent.set_run_return({.ok      = false,
                                   .error = std::make_error_code(ESP_FAIL),
                                   .called  = false});
-
-    testComponent.set_stop_return({.ok      = false,
-                                   .error = std::make_error_code(ESP_FAIL),
-                                   .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
     while (!testComponent.stop_called()) {}
@@ -91,6 +93,11 @@ void testComponentShouldBeDisabledAfterInitializeError() {
                                          .error = std::make_error_code(ESP_FAIL),
                                          .called  = false});
 
+    // Set called to false as it may have been set to true already in the thread
+    testComponent.set_run_return({.ok      = true,
+                                  .error = {},
+                                  .called  = false});
+
     m.start();
     sleep(1);
 
@@ -98,14 +105,15 @@ void testComponentShouldBeDisabledAfterInitializeError() {
 }
 
 void testComponentShouldBeDisabledAfterInitializeErrorInRestart() {
+    // First setup stop error to prevent race condition
+    testComponent.set_initialize_return({.ok      = false,
+                                         .error = std::make_error_code(ESP_FAIL),
+                                         .called  = false});
+
     // Trigger call to restart_component
     testComponent.set_run_return({.ok      = false,
                                   .error = std::make_error_code(ESP_FAIL),
                                   .called  = false});
-
-    testComponent.set_initialize_return({.ok      = false,
-                                         .error = std::make_error_code(ESP_FAIL),
-                                         .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
     while (!testComponent.stop_called()) {}
