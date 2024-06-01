@@ -41,7 +41,7 @@ namespace sdk {
             wifi_mode_t currentMode = WIFI_MODE_NULL;
             esp_err_t   err         = esp_wifi_get_mode(&currentMode);
             if (err == ESP_ERR_WIFI_NOT_INIT) {
-                ESP_LOGD(TAG, "Wifi is not running, returning");
+                ESP_LOGW(TAG, "Wifi is not running, returning");
             } else if (err == ESP_OK && currentMode == WIFI_MODE_STA) {
                 err = esp_wifi_stop();
                 if (err != ESP_OK) {
