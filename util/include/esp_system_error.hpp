@@ -25,10 +25,7 @@ namespace std {
     template<>
     struct is_error_code_enum<sdk::EspErrorCategory> : true_type {};
 
-    std::error_code make_error_code(esp_err_t e) {
-        static sdk::EspErrorCategory category;
-        return {static_cast<int>(e), category};
-    }
+    std::error_code make_error_code(esp_err_t e);
 } // namespace std
 
 #endif // ESP_SYSTEM_ERROR_HPP

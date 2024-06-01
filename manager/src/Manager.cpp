@@ -41,13 +41,13 @@ namespace sdk {
         for (auto& entry: m_components) {
             auto& c   = entry.second.get();
             auto  res = c.initialize();
-            if (res.isErr()) {
-                ESP_LOGE(TAG, "Component %s failed to start: %s",
-                         c.getTag().c_str(), res.unwrapErr().c_str());
-                entry.first = false;
-            } else {
+            if (res.has_value()) {
                 ESP_LOGD(TAG, "Initialized component: %s", c.getTag().c_str());
                 entry.first = true;
+            } else {
+                ESP_LOGE(TAG, "Component %s failed to start: %s",
+                         c.getTag().c_str(), res.error().message().c_str());
+                entry.first = false;
             }
         }
 
@@ -57,11 +57,11 @@ namespace sdk {
                     Component& c = entry.second;
 
                     auto res = c.run();
-                    if (res.isErr()) {
+                    if (!res.has_value()) {
                         ESP_LOGW(TAG, "Component %s reported an error: %s",
-                                 c.getTag().c_str(), res.unwrapErr().c_str());
+                                 c.getTag().c_str(), res.error().message().c_str());
                         restartComponent(entry);
-                    } else if (res.unwrap() == ComponentStatus::DEINITIALIZED) {
+                    } else if (res.value() == ComponentStatus::DEINITIALIZED) {
                         entry.first = false;
                     }
                 }
@@ -73,7 +73,7 @@ namespace sdk {
 
         for (auto& entry: m_components) {
             auto res = entry.second.get().stop();
-            if (res.isErr()) {
+            if (!res.has_value()) {
                 ESP_LOGE(TAG, "Failed to stop component %s on shutdown of manager",
                          entry.second.get().getTag().c_str());
             }
@@ -86,17 +86,17 @@ namespace sdk {
         Component& c = entry.second.get();
 
         auto stopRes = c.stop();
-        if (stopRes.isErr()) {
+        if (!stopRes.has_value()) {
             ESP_LOGE(TAG, "Failed to stop component %s: %s",
-                     c.getTag().c_str(), stopRes.unwrapErr().c_str());
+                     c.getTag().c_str(), stopRes.error().message().c_str());
             entry.first = false;
             return;
         }
 
         auto initRes = c.initialize();
-        if (initRes.isErr()) {
+        if (!initRes.has_value()) {
             ESP_LOGE(TAG, "Failed to re-initialize component %s: %s",
-                     c.getTag().c_str(), initRes.unwrapErr().c_str());
+                     c.getTag().c_str(), initRes.error().message().c_str());
             entry.first = false;
             c.stop();
             return;

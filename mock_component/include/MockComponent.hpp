@@ -22,7 +22,7 @@ namespace sdk {
 
         struct MockResult {
             bool             ok;
-            etl::string<128> message;
+            std::error_code error;
             bool             called;
         };
 
@@ -49,10 +49,10 @@ namespace sdk {
     private:
         static const inline char TAG[] = "MockResult component";
 
-        MockResult m_statusReturn{.ok = true, .message = "", .called = false};
-        MockResult m_initializeReturn{.ok = true, .message = "", .called = false};
-        MockResult m_runReturn{.ok = true, .message = "", .called = false};
-        MockResult m_stopReturn{.ok = true, .message = "", .called = false};
+        MockResult m_statusReturn{.ok = true, .error = {}, .called = false};
+        MockResult m_initializeReturn{.ok = true, .error = {}, .called = false};
+        MockResult m_runReturn{.ok = true, .error = {}, .called = false};
+        MockResult m_stopReturn{.ok = true, .error = {}, .called = false};
     };
 
 } // namespace sdk
