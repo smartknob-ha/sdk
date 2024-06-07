@@ -1,18 +1,14 @@
 #include "../include/Manager.hpp"
 
 #include "esp_log.h"
+#include "esp_system_error.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 namespace sdk {
 
-    Manager& Manager::instance() {
-        static Manager* self;
-        if (self == nullptr) {
-            self = new Manager();
-        }
-        return *self;
-    }
+    static etl::vector<componentEntry, CONFIG_NUM_COMPONENTS> m_components {};
+    static bool m_running {false};
 
     void Manager::addComponent(Component& ref) {
         assert(!m_components.full());
@@ -22,49 +18,57 @@ namespace sdk {
     void Manager::start() {
         if (!m_running) {
             m_running = true;
-            xTaskCreate(startRun, "manager", 4096, this, 1, nullptr);
+            xTaskCreate(Manager::run, "manager", 4096, nullptr, 1, nullptr);
         }
-    }
-
-    void Manager::startRun(void* _this) {
-        Manager* m = static_cast<Manager*>(_this);
-        m->run();
     }
 
     void Manager::stop() {
         m_running = false;
     }
 
-    void Manager::run() {
-        ESP_LOGD(TAG, "Starting manager::run()");
+    bool Manager::getInitialized() {
+        return std::ranges::all_of(m_components.begin(), m_components.end(),
+                [&](const componentEntry& entry) {
+                    return entry.first;
+                });
+    }
 
-        for (auto& entry: m_components) {
-            auto& c   = entry.second.get();
-            auto  res = c.initialize();
-            if (res.has_value()) {
-                ESP_LOGD(TAG, "Initialized component: %s", c.getTag().c_str());
-                entry.first = true;
-            } else {
-                ESP_LOGE(TAG, "Component %s failed to start: %s",
-                         c.getTag().c_str(), res.error().message().c_str());
-                entry.first = false;
-            }
+    std::expected<bool, esp_err_t > Manager::getInitialized(const char* tag) {
+        auto it = std::find_if(m_components.begin(), m_components.end(), [&](componentEntry& entry) {
+            return entry.second.get().getTag() == tag;
+        });
+
+        if (it != m_components.end()) {
+            return it->first;
+        } else {
+            return std::unexpected(ESP_ERR_NOT_FOUND);
         }
+    }
+
+    void Manager::run(void*) {
+        ESP_LOGD(TAG, "Starting manager::run()");
 
         while (m_running) {
             for (auto& entry: m_components) {
+                // entry.first is a bool that describes whether the component is active
                 if (entry.first) {
-                    Component& c = entry.second;
+                    Component& component = entry.second;
 
-                    auto res = c.run();
+                    auto res = component.run();
                     if (!res.has_value()) {
                         ESP_LOGW(TAG, "Component %s reported an error: %s",
-                                 c.getTag().c_str(), res.error().message().c_str());
+                                 component.getTag().c_str(), res.error().message().c_str());
                         restartComponent(entry);
                     } else if (res.value() == ComponentStatus::DEINITIALIZED) {
                         entry.first = false;
                     }
-                }
+                } else {
+                    auto status = entry.second.get().getStatus();
+                    // Only initialise components if they
+                    if (status.has_value() && status.value() < ComponentStatus::DEINITIALIZED) {
+                        initComponent(entry);
+                    }
+				}
             }
 
             // Prevent watchdog trigger
@@ -82,27 +86,41 @@ namespace sdk {
         vTaskDelete(nullptr);
     }
 
-    void Manager::restartComponent(componentEntry& entry) {
-        Component& c = entry.second.get();
+    void Manager::initComponent(componentEntry& entry) {
+        auto& component   = entry.second.get();
+        auto  res = component.initialize();
+        if (res.has_value()) {
+            ESP_LOGD(TAG, "Initialized component: %s", component.getTag().c_str());
+            entry.first = true;
+        } else {
+            ESP_LOGE(TAG, "Component %s failed to start: %s",
+                     component.getTag().c_str(), res.error().message().c_str());
+            entry.first = false;
+        }
+    }
 
-        auto stopRes = c.stop();
+    void Manager::restartComponent(componentEntry& entry) {
+        Component& component = entry.second.get();
+
+        auto stopRes = component.stop();
         if (!stopRes.has_value()) {
             ESP_LOGE(TAG, "Failed to stop component %s: %s",
-                     c.getTag().c_str(), stopRes.error().message().c_str());
+                     component.getTag().c_str(), stopRes.error().message().c_str());
             entry.first = false;
             return;
         }
 
-        auto initRes = c.initialize();
+        auto initRes = component.initialize();
         if (!initRes.has_value()) {
             ESP_LOGE(TAG, "Failed to re-initialize component %s: %s",
-                     c.getTag().c_str(), initRes.error().message().c_str());
+                     component.getTag().c_str(), initRes.error().message().c_str());
             entry.first = false;
-            c.stop();
+            component.stop();
             return;
         }
 
         entry.first = true;
     }
+
 
 } // namespace sdk
