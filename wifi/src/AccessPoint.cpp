@@ -26,11 +26,11 @@ namespace sdk::wifi {
     }
 
     res AccessPoint::getStatus() {
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res AccessPoint::run() {
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res AccessPoint::stop() {
@@ -52,7 +52,7 @@ namespace sdk::wifi {
                 return std::unexpected(std::make_error_code(err));
             }
         }
-        return ComponentStatus::STOPPED;
+        return Status::STOPPED;
     }
 
     res AccessPoint::initialize() {
@@ -64,7 +64,7 @@ namespace sdk::wifi {
 
         // Wait for AP_INITIALIZED_BIT to be set by the event handler
         xEventGroupWaitBits(eventGroup, AP_INITIALIZED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res AccessPoint::initialize_non_blocking() {
@@ -73,7 +73,7 @@ namespace sdk::wifi {
 
         if (err == ESP_OK && current_mode == WIFI_MODE_AP) {
             m_wifiInitialized = true;
-            return sdk::ComponentStatus::RUNNING;
+            return Status::RUNNING;
         } else if (err == ESP_OK && current_mode == WIFI_MODE_STA) {
             ESP_LOGW(TAG, "Wifi already initialized as STA, attempting to add Soft AP");
             new_mode          = WIFI_MODE_APSTA;
@@ -111,7 +111,7 @@ namespace sdk::wifi {
         }
 
         ESP_LOGD(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifiConfig.ap.ssid, wifiConfig.ap.password, wifiConfig.ap.channel);
-        return ComponentStatus::INITIALIZING;
+        return Status::INITIALIZING;
     }
 
     void AccessPoint::eventHandler(void* arg, esp_event_base_t eventBase,

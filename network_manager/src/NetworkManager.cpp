@@ -10,11 +10,11 @@
 
 namespace sdk {
     res NetworkManager::getStatus() {
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res NetworkManager::run() {
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res NetworkManager::stop() {
@@ -22,7 +22,7 @@ namespace sdk {
         if (stationRet.has_value()) {
             auto accessPointRet = ap.stop();
             if (accessPointRet.has_value()) {
-                return ComponentStatus::STOPPED;
+                return Status::STOPPED;
             }
             ESP_LOGI(TAG, "Error stopping AP: %s", accessPointRet.error().message().c_str());
             return accessPointRet;
@@ -32,7 +32,7 @@ namespace sdk {
     }
 
     res NetworkManager::initialize() {
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res NetworkManager::setAccessPointState(bool state) {
@@ -68,7 +68,7 @@ namespace sdk {
                 ESP_LOGE(TAG, "Error starting DHCP client: %s", esp_err_to_name(ret));
                 return std::unexpected(std::make_error_code(ret));
             } else {
-                return ComponentStatus::RUNNING;
+                return Status::RUNNING;
             }
         } else {
             auto ret = esp_netif_dhcpc_stop(sta.getNetif());
@@ -106,7 +106,7 @@ namespace sdk {
                 }
             }
         }
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     void NetworkManager::initSNTP() {

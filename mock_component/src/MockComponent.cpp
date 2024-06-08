@@ -9,7 +9,7 @@ namespace sdk {
             return std::unexpected(m_statusReturn.error);
         }
 
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res MockComponent::initialize() {
@@ -19,7 +19,7 @@ namespace sdk {
             return std::unexpected(m_initializeReturn.error);
         }
 
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res MockComponent::run() {
@@ -29,7 +29,7 @@ namespace sdk {
             return std::unexpected(m_initializeReturn.error);
         }
 
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     res MockComponent::stop() {
@@ -39,7 +39,7 @@ namespace sdk {
             return std::unexpected(m_stopReturn.error);
         }
 
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     void MockComponent::reset() {

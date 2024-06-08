@@ -38,6 +38,11 @@ namespace sdk {
         static void stop();
 
         /**
+         * @brief Stops the manager and any added components
+         */
+        static void stopAll();
+
+        /**
          * @brief   Checks initialization status of added components
          * @return  True when all present components are running
          */
@@ -47,6 +52,8 @@ namespace sdk {
 
     private:
         static constexpr inline char TAG[] = "Manager";
+
+        static TaskHandle_t m_taskHandle;
 
         /**
          * Make sure this class is atomic
@@ -67,8 +74,9 @@ namespace sdk {
         /**
          * @brief Initializes component
          * @param entry Reference to componentEntry
+         * @returns Whether initialisation completed successfully
          */
-        static void initComponent(componentEntry& entry);
+        static bool initComponent(componentEntry& entry);
 
         /**
          * @brief   restartComponent will attempt to restart

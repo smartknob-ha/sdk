@@ -5,4 +5,8 @@ menu "Manager"
         default 1
         help
             You should probably not touch this unless you've added a component
+
+    config RUN_TASK_STACK_SIZE
+        int "Size of the stack for the manager run task, size in words"
+        default 4096
 endmenu

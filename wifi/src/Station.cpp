@@ -30,11 +30,11 @@ namespace sdk {
         }
 
         res Station::getStatus() {
-            return ComponentStatus::RUNNING;
+            return Status::RUNNING;
         }
 
         res Station::run() {
-            return ComponentStatus::RUNNING;
+            return Status::RUNNING;
         }
 
         res Station::stop() {
@@ -56,7 +56,7 @@ namespace sdk {
                     return std::unexpected(std::make_error_code(err));
                 }
             }
-            return ComponentStatus::STOPPED;
+            return Status::STOPPED;
         }
 
         res Station::initialize() {
@@ -72,7 +72,7 @@ namespace sdk {
                                                    30000 / portTICK_PERIOD_MS); // 30 seconds
 
             if (bits == STA_CONNECTED_BIT) {
-                return ComponentStatus::RUNNING;
+                return Status::RUNNING;
             } else if (bits == STA_DISCONNECTED_BIT) {
                 ESP_LOGE(TAG, "Failed to connect to wifi");
                 return std::unexpected(std::make_error_code(ESP_ERR_WIFI_NOT_CONNECT));
@@ -87,7 +87,7 @@ namespace sdk {
             esp_err_t   err = esp_wifi_get_mode(&current_mode);
             if (err == ESP_OK && current_mode == WIFI_MODE_STA) {
                 m_wifiInitialized = true;
-                return sdk::ComponentStatus::RUNNING;
+                return Status::RUNNING;
             } else if (err == ESP_OK && current_mode == WIFI_MODE_AP) {
                 ESP_LOGW(TAG, "Wifi already initialized as AP, attempting to add Soft STA");
                 new_mode          = WIFI_MODE_APSTA;
@@ -142,7 +142,7 @@ namespace sdk {
 
             ESP_LOGI(TAG, "Attempting to connect to: \"%s\"", wifiConfig.sta.ssid);
 
-            return ComponentStatus::RUNNING;
+            return Status::RUNNING;
         }
 
         void Station::eventHandler(void* arg, esp_event_base_t eventBase,
