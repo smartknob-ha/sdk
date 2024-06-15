@@ -94,6 +94,14 @@ namespace sdk {
         virtual etl::string<50> getTag() = 0;
 
         /**
+         * @brief Sets the log level for the component
+         * @param level The log level to set
+         */
+        void setLogLevel(esp_log_level_t level) {
+            esp_log_level_set(getTag().c_str(), level);
+        }
+
+        /**
          * @brief Returns component status, may include error
          */
         virtual Status getStatus() { return m_status; };
