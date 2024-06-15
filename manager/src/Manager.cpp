@@ -56,14 +56,14 @@ namespace sdk {
         }
     }
 
-    bool Manager::getInitialized() {
+    bool Manager::isInitialized() {
         return std::ranges::all_of(m_components.begin(), m_components.end(),
                                    [&](const componentEntry& entry) {
                                        return entry.first;
                                    });
     }
 
-    std::expected<bool, esp_err_t> Manager::getInitialized(const char* tag) {
+    std::expected<bool, esp_err_t> Manager::isComponentInitialized(const char* tag) {
         auto it = std::find_if(m_components.begin(), m_components.end(), [&](componentEntry& entry) {
             return entry.second.get().getTag() == tag;
         });

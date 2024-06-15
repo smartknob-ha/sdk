@@ -46,9 +46,14 @@ namespace sdk {
          * @brief   Checks initialization status of added components
          * @return  True when all present components are running
          */
-        static bool getInitialized();
+        static bool isInitialized();
 
-        static std::expected<bool, esp_err_t> getInitialized(const char* tag);
+        /**
+         * @brief Chekcs whether component has been successfully initialized
+         * @param tag Tag of the component to check for
+         * @return Boolean whether initialized if tag was found, otherwise error
+         */
+        static std::expected<bool, esp_err_t> isComponentInitialized(const char* tag);
 
     private:
         static constexpr inline char TAG[] = "Manager";
