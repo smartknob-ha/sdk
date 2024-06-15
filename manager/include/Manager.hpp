@@ -53,7 +53,7 @@ namespace sdk {
     private:
         static constexpr inline char TAG[] = "Manager";
 
-        static TaskHandle_t m_taskHandle;
+        static inline TaskHandle_t m_taskHandle {NULL};
 
         /**
          * Make sure this class is atomic

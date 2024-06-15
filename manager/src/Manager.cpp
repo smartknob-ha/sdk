@@ -84,17 +84,13 @@ namespace sdk {
                 bool&      componentActive = entry.first;
                 Component& component       = entry.second;
                 if (componentActive) {
-                    auto res = component.run();
-                    if (!res.has_value()) {
+                    if (component.run() == Component::Status::ERROR) {
                         ESP_LOGW(TAG, "Component %s reported an error: %s, attempting to restart",
-                                 component.getTag().c_str(), res.error().message().c_str());
+                                 component.getTag().c_str(), component.getError()->c_str());
                         restartComponent(entry);
-                    } else if (res.value() == Component::Status::ERROR) {
-                        componentActive = false;
                     }
                 } else {
-                    auto status = component.getStatus();
-                    if (status.has_value() && status.value() == Component::Status::UNINITIALIZED) {
+                    if (component.getStatus() == Component::Status::UNINITIALIZED) {
                         initComponent(entry);
                     }
                 }
@@ -110,23 +106,14 @@ namespace sdk {
 
     bool Manager::initComponent(componentEntry& entry) {
         auto& component = entry.second.get();
-        auto  res       = component.initialize();
-        if (res.has_value()) {
-            ESP_LOGD(TAG, "Initialized component: %s", component.getTag().c_str());
-            entry.first = true;
+        bool& componentRunning = entry.first;
+        auto  status       = component.initialize();
+        if (status == Component::Status::RUNNING) {
+            ESP_LOGI(TAG, "Initialized component: %s", component.getTag().c_str());
+            return componentRunning = true;
         } else {
-            ESP_LOGE(TAG, "Component %s failed to start: %s",
-                     component.getTag().c_str(), res.error().message().c_str());
-            entry.first = false;
-        }
-
-        bool done = false;
-        while (!done) {
-            auto status = component.getStatus();
-            if (status.has_value() && status.value() > Component::Status::INITIALIZING) {
-                done = true;
-            }
-            vTaskDelay(1);
+            ESP_LOGE(TAG, "Component %s failed to start", component.getTag().c_str());
+            return componentRunning = false;
         }
     }
 

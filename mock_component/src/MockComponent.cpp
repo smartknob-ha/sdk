@@ -1,52 +1,38 @@
 #include "../include/MockComponent.hpp"
 
 namespace sdk {
+    using Status = Component::Status;
+    using res    = Component::res;
 
-    res MockComponent::getStatus() {
+    Status MockComponent::getStatus() {
         m_statusReturn.called = true;
 
-        if (!m_statusReturn.ok) {
-            return std::unexpected(m_statusReturn.error);
-        }
-
-        return Status::RUNNING;
+        return m_statusReturn.status;
     }
 
-    res MockComponent::initialize() {
+    Status MockComponent::initialize() {
         m_initializeReturn.called = true;
 
-        if (!m_initializeReturn.ok) {
-            return std::unexpected(m_initializeReturn.error);
-        }
-
-        return Status::RUNNING;
+        return m_initializeReturn.status;
     }
 
-    res MockComponent::run() {
+    Status MockComponent::run() {
         m_runReturn.called = true;
 
-        if (!m_runReturn.ok) {
-            return std::unexpected(m_initializeReturn.error);
-        }
-
-        return Status::RUNNING;
+        return m_runReturn.status;
     }
 
-    res MockComponent::stop() {
+    Status MockComponent::stop() {
         m_stopReturn.called = true;
 
-        if (!m_stopReturn.ok) {
-            return std::unexpected(m_stopReturn.error);
-        }
-
-        return Status::RUNNING;
+        return m_stopReturn.status;
     }
 
     void MockComponent::reset() {
-        m_statusReturn     = {.ok = true, .error = {}, .called = false};
-        m_initializeReturn = {.ok = true, .error = {}, .called = false};
-        m_runReturn        = {.ok = true, .error = {}, .called = false};
-        m_stopReturn       = {.ok = true, .error = {}, .called = false};
+        m_statusReturn     = {.status = Status::RUNNING, .called = false};
+        m_initializeReturn = {.status = Status::RUNNING, .called = false};
+        m_runReturn        = {.status = Status::RUNNING, .called = false};
+        m_stopReturn       = {.status = Status::RUNNING, .called = false};
     }
 
 } // namespace sdk

@@ -26,14 +26,13 @@ namespace sdk {
             wifi::AccessPoint::Config ap;
         } Config;
 
-        NetworkManager(Config config) : m_config(config), ap(config.ap), sta(config.sta){};
+        NetworkManager(Config config) : m_config(config), m_accessPoint(config.ap), m_station(config.sta) {};
 
         /* Component override functions */
-        virtual etl::string<50> getTag() override { return TAG; };
-        virtual res             getStatus() override;
-        virtual res             initialize() override;
-        virtual res             run() override;
-        virtual res             stop() override;
+        virtual etl::string<50>                 getTag() override { return TAG; };
+        virtual Status                          initialize() override;
+        virtual Status                          run() override;
+        virtual Status                          stop() override;
 
         /* state = true for DHCP, false for static IP */
         res  setIpMode(bool state);
@@ -52,8 +51,8 @@ namespace sdk {
 
         Config m_config;
 
-        wifi::AccessPoint ap;
-        wifi::Station     sta;
+        wifi::AccessPoint m_accessPoint;
+        wifi::Station     m_station;
     };
 
 } // namespace sdk

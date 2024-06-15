@@ -11,29 +11,29 @@
 
 #define AP_INITIALIZED_BIT BIT0
 
-#define INIT_RETURN_ON_ERROR(err)                                           \
-    do {                                                                    \
-        if (err != ESP_OK) {                                                \
-            ESP_LOGE(TAG, "Failed to init AP: %s", esp_err_to_name(err)); \
-            return std::unexpected(std::make_error_code(err));              \
-        }                                                                   \
+#define INIT_RETURN_ON_ERROR(err)                                      \
+    do {                                                               \
+        if (err != ESP_OK) {                                           \
+            ESP_LOGE(TAG, "Failed to init: %s", esp_err_to_name(err)); \
+            m_err           = err;                                     \
+            return m_status = Status::ERROR;                           \
+        }                                                              \
     } while (0)
 
 namespace sdk::wifi {
+
+    using Status = sdk::Component::Status;
+    using res    = sdk::Component::res;
 
     AccessPoint::AccessPoint(Config config) : m_config(config) {
         eventGroup = xEventGroupCreate();
     }
 
-    res AccessPoint::getStatus() {
-        return Status::RUNNING;
+    Status AccessPoint::run() {
+        return m_status;
     }
 
-    res AccessPoint::run() {
-        return Status::RUNNING;
-    }
-
-    res AccessPoint::stop() {
+    Status AccessPoint::stop() {
         wifi_mode_t currentMode = WIFI_MODE_NULL;
         esp_err_t   err         = esp_wifi_get_mode(&currentMode);
         if (err == ESP_ERR_WIFI_NOT_INIT) {
@@ -42,38 +42,39 @@ namespace sdk::wifi {
             err = esp_wifi_stop();
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to stop wifi: %s", esp_err_to_name(err));
-                return std::unexpected(std::make_error_code(err));
+                return m_status = Status::ERROR;
             }
         } else if (err == ESP_OK && currentMode == WIFI_MODE_APSTA) {
             ESP_LOGD(TAG, "Wifi is in APSTA mode, stopping AP only");
             err = esp_wifi_set_mode(WIFI_MODE_STA);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to set wifi mode to STA: %s", esp_err_to_name(err));
-                return std::unexpected(std::make_error_code(err));
+                return m_status = Status::ERROR;
             }
         }
         return Status::STOPPED;
     }
 
-    res AccessPoint::initialize() {
+    Status AccessPoint::initialize() {
         auto ret = initialize_non_blocking();
         if (!ret.has_value()) {
             ESP_LOGE(TAG, "Failed to initialize AP: %s", ret.error().message().c_str());
-            return ret;
+            return m_status = Status::ERROR;
         }
 
         // Wait for AP_INITIALIZED_BIT to be set by the event handler
         xEventGroupWaitBits(eventGroup, AP_INITIALIZED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
-        return Status::RUNNING;
+        return m_status = Status::RUNNING;
     }
 
     res AccessPoint::initialize_non_blocking() {
+        m_status                 = Status::INITIALIZING;
         wifi_mode_t current_mode = WIFI_MODE_NULL, new_mode = WIFI_MODE_AP;
         esp_err_t   err = esp_wifi_get_mode(&current_mode);
 
         if (err == ESP_OK && current_mode == WIFI_MODE_AP) {
             m_wifiInitialized = true;
-            return Status::RUNNING;
+            return m_status   = Status::RUNNING;
         } else if (err == ESP_OK && current_mode == WIFI_MODE_STA) {
             ESP_LOGW(TAG, "Wifi already initialized as STA, attempting to add Soft AP");
             new_mode          = WIFI_MODE_APSTA;
@@ -111,7 +112,7 @@ namespace sdk::wifi {
         }
 
         ESP_LOGD(TAG, "AP initialized. SSID:%s password:%s channel:%d", wifiConfig.ap.ssid, wifiConfig.ap.password, wifiConfig.ap.channel);
-        return Status::INITIALIZING;
+        return m_status = Status::RUNNING;
     }
 
     void AccessPoint::eventHandler(void* arg, esp_event_base_t eventBase,

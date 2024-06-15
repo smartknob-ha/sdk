@@ -10,6 +10,8 @@
 
 #include "esp_err.h"
 
+#include "ConfigProvider.hpp"
+
 namespace sdk {
 
     template<UBaseType_t LEN, typename QUEUETYPE, TickType_t ENQUEUE_TIMEOUT>
@@ -94,18 +96,30 @@ namespace sdk {
         /**
          * @brief Returns component status, may include error
          */
-        virtual Status getStatus() = 0;
+        virtual Status getStatus() { return m_status; };
 
         /**
          * @brief Gets component error
          * @return  Nothing when status isn't ERROR, error message when it is
          */
-        virtual std::optional<etl::string<128>> getError() = 0;
+        virtual std::optional<etl::string<128>> getError() {
+            if (m_status == Status::ERROR && m_err != ESP_OK) {
+                return esp_err_to_name(m_err);
+            }
+            return {};
+        }
+
+        /**
+         * @brief Check if a component or device restart is required
+         */
+        virtual RestartType getRestartType() {
+            return RestartType::NONE;
+        };
 
         /**
          * @brief Gets called by the manager before startup
          */
-        virtual Status initialize() { return Status::UNINITIALIZED; };
+        virtual Status initialize() = 0;
 
         /**
          * @brief Gets called by the manager in its' main loop
@@ -114,7 +128,7 @@ namespace sdk {
          *          the component by calling stop(), initialize()
          *          and run().
          */
-        virtual Status run() { return Status::UNINITIALIZED; };
+        virtual Status run() = 0;
 
 
         /**
@@ -122,6 +136,9 @@ namespace sdk {
          *        an error status, or when the main thread is stopped
          */
         virtual Status stop() = 0;
+    protected:
+        Status                   m_status{Status::UNINITIALIZED};
+        esp_err_t                m_err{ESP_OK};
     };
 
 } /* namespace sdk */
