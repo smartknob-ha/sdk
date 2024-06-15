@@ -35,10 +35,9 @@ namespace sdk {
             /* Component override functions */
             virtual etl::string<50> getTag() override { return TAG; };
 
-            virtual res getStatus() override;
-            virtual res initialize() override;
-            virtual res run() override;
-            virtual res stop() override;
+            virtual Status initialize() override;
+            virtual Status run() override;
+            virtual Status stop() override;
 
             // Initializes AP but returns while it may not be finished starting up
             res  initialize_non_blocking();

@@ -9,37 +9,37 @@
 #include "lwip/sockets.h"
 
 namespace sdk {
-    res NetworkManager::getStatus() {
-        return ComponentStatus::RUNNING;
+    using Status = Component::Status;
+    using res = Component::res;
+
+    Status NetworkManager::run() {
+        return Status::RUNNING;
     }
 
-    res NetworkManager::run() {
-        return ComponentStatus::RUNNING;
-    }
-
-    res NetworkManager::stop() {
-        auto stationRet = sta.stop();
-        if (stationRet.has_value()) {
-            auto accessPointRet = ap.stop();
-            if (accessPointRet.has_value()) {
-                return ComponentStatus::STOPPED;
+    Status NetworkManager::stop() {
+        auto stationRet = m_station.stop();
+        if (stationRet == Status::STOPPED) {
+            auto accessPointRet = m_accessPoint.stop();
+            if (accessPointRet == Status::STOPPED) {
+                return m_status = Status::STOPPED;
             }
-            ESP_LOGI(TAG, "Error stopping AP: %s", accessPointRet.error().message().c_str());
+            ESP_LOGI(TAG, "Error stopping AP: %s", m_accessPoint.getError().value_or("undefined error").c_str());
             return accessPointRet;
         }
-        ESP_LOGI(TAG, "Error stopping STA: %s", stationRet.error().message().c_str());
+        ESP_LOGI(TAG, "Error stopping STA: %s", m_station.getError().value().c_str());
         return stationRet;
     }
 
-    res NetworkManager::initialize() {
-        return ComponentStatus::RUNNING;
+    Status NetworkManager::initialize() {
+        //TODO figure out network init cycle
+        return Status::RUNNING;
     }
 
     res NetworkManager::setAccessPointState(bool state) {
         if (state)
-            return ap.initialize();
+            return m_accessPoint.initialize();
         else
-            return ap.stop();
+            return m_accessPoint.stop();
     }
 
     void NetworkManager::setAccessPointConfig(wifi::AccessPoint::Config conf) {
@@ -48,13 +48,13 @@ namespace sdk {
 
     res NetworkManager::setStationState(bool state) {
         if (state) {
-            auto ret = sta.initialize();
-            if (ret.has_value()) {
+            auto ret = m_station.initialize();
+            if (ret == Status::RUNNING) {
                 return setIpMode(m_config.dhcpEnable);
             }
             return ret;
         } else
-            return sta.stop();
+            return m_station.stop();
     }
 
     void NetworkManager::setStationConfig(wifi::Station::Config conf) {
@@ -63,15 +63,15 @@ namespace sdk {
 
     res NetworkManager::setIpMode(bool state) {
         if (state) {
-            auto ret = esp_netif_dhcpc_start(sta.getNetif());
+            auto ret = esp_netif_dhcpc_start(m_station.getNetif());
             if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED) {
                 ESP_LOGE(TAG, "Error starting DHCP client: %s", esp_err_to_name(ret));
                 return std::unexpected(std::make_error_code(ret));
             } else {
-                return ComponentStatus::RUNNING;
+                return m_status = Status::RUNNING;
             }
         } else {
-            auto ret = esp_netif_dhcpc_stop(sta.getNetif());
+            auto ret = esp_netif_dhcpc_stop(m_station.getNetif());
             if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED) {
                 ESP_LOGE(TAG, "Error stopping DHCP client: %s", esp_err_to_name(ret));
                 return std::unexpected(std::make_error_code(ret));
@@ -81,7 +81,7 @@ namespace sdk {
                 inet_pton(AF_INET, m_config.ipv4Gateway.c_str(), &ip4Conf.gw);
                 inet_pton(AF_INET, m_config.ipv4Netmask.c_str(), &ip4Conf.netmask);
 
-                auto err = std::make_error_code(esp_netif_set_ip_info(sta.getNetif(), &ip4Conf));
+                auto err = std::make_error_code(esp_netif_set_ip_info(m_station.getNetif(), &ip4Conf));
                 if (err) {
                     ESP_LOGE(TAG, "Error setting static IP: %s", err.message().c_str());
                     return std::unexpected(err);
@@ -89,7 +89,7 @@ namespace sdk {
 
                 esp_netif_dns_info_t dnsInfo;
                 inet_pton(AF_INET, m_config.ipv4DnsMain.c_str(), &dnsInfo.ip);
-                err = std::make_error_code(esp_netif_set_dns_info(sta.getNetif(), ESP_NETIF_DNS_MAIN, &dnsInfo));
+                err = std::make_error_code(esp_netif_set_dns_info(m_station.getNetif(), ESP_NETIF_DNS_MAIN, &dnsInfo));
                 if (err) {
                     ESP_LOGE(TAG, "Error setting static IP: %s", err.message().c_str());
                     return std::unexpected(err);
@@ -98,7 +98,7 @@ namespace sdk {
                 // Only set secondary if it has been set
                 if (!m_config.ipv4DnsSecondary.empty()) {
                     inet_pton(AF_INET, m_config.ipv4DnsSecondary.c_str(), &dnsInfo.ip);
-                    err = std::make_error_code(esp_netif_set_dns_info(sta.getNetif(), ESP_NETIF_DNS_BACKUP, &dnsInfo));
+                    err = std::make_error_code(esp_netif_set_dns_info(m_station.getNetif(), ESP_NETIF_DNS_BACKUP, &dnsInfo));
                     if (err) {
                         ESP_LOGE(TAG, "Error setting static IP: %s", err.message().c_str());
                         return std::unexpected(err);
@@ -106,7 +106,7 @@ namespace sdk {
                 }
             }
         }
-        return ComponentStatus::RUNNING;
+        return Status::RUNNING;
     }
 
     void NetworkManager::initSNTP() {

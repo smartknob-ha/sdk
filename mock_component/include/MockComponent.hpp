@@ -17,21 +17,20 @@ namespace sdk {
      */
     class MockComponent : public Component, public HasQueue<10, MockMessage, 0> {
     public:
-        MockComponent(){};
+        MockComponent() {};
         ~MockComponent() = default;
 
         struct MockResult {
-            bool             ok;
-            std::error_code error;
-            bool             called;
+            Status status;
+            bool   called;
         };
 
         /* Component override functions */
         virtual etl::string<50> getTag() override { return TAG; };
-        virtual res             getStatus() override;
-        virtual res             initialize() override;
-        virtual res             run() override;
-        virtual res             stop() override;
+        virtual Status          getStatus() override;
+        virtual Status          initialize() override;
+        virtual Status          run() override;
+        virtual Status          stop() override;
 
         /* Testing functions */
         void set_status(MockResult value) { m_statusReturn = value; };
@@ -49,10 +48,10 @@ namespace sdk {
     private:
         static const inline char TAG[] = "MockResult component";
 
-        MockResult m_statusReturn{.ok = true, .error = {}, .called = false};
-        MockResult m_initializeReturn{.ok = true, .error = {}, .called = false};
-        MockResult m_runReturn{.ok = true, .error = {}, .called = false};
-        MockResult m_stopReturn{.ok = true, .error = {}, .called = false};
+        MockResult m_statusReturn{.status = Status::RUNNING, .called = false};
+        MockResult m_initializeReturn{.status = Status::RUNNING, .called = false};
+        MockResult m_runReturn{.status = Status::RUNNING, .called = false};
+        MockResult m_stopReturn{.status = Status::RUNNING, .called = false};
     };
 
 } // namespace sdk

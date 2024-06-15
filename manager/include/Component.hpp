@@ -10,31 +10,9 @@
 
 #include "esp_err.h"
 
+#include "ConfigProvider.hpp"
+
 namespace sdk {
-
-    /**
-     * @brief   This is supposed to be a list of all the components
-     *          used in the SmartKnob-ha SDK.
-     * @details When adding a component, add it between the last
-     *          component and the MAX element.
-     **/
-    enum class Components {
-        WIFI_STATION,
-        WIFI_AP,
-
-        MAX, // reserved spot at the end of the list
-    };
-
-    enum class ComponentStatus {
-        UNINITIALIZED,
-        INITIALIZING,
-        RUNNING,
-        STOPPING,
-        STOPPED,
-        DEINITIALIZED
-    };
-
-    using res = std::expected<ComponentStatus, std::error_code>;
 
     template<UBaseType_t LEN, typename QUEUETYPE, TickType_t ENQUEUE_TIMEOUT>
     class HasQueue {
@@ -48,11 +26,11 @@ namespace sdk {
          * 	like this: `void enqueue(your_type& message) override { has_queue<1, your_type, 0>::enqueue(message); }`
          */
         virtual void enqueue(QUEUETYPE& item) {
-            xQueueSend(m_queue, (void*) &item, ENQUEUE_TIMEOUT);
+            xQueueSend(m_queue, static_cast<void*>(&item), ENQUEUE_TIMEOUT);
         }
 
         ~HasQueue() {
-            vQueueUnregisterQueue(m_queue);
+            vQueueUnregisterQueue(m_queue)
         }
 
     protected:
@@ -63,7 +41,7 @@ namespace sdk {
          * @return pdTRUE if a message was read, pdFALSE if not
          */
         BaseType_t dequeue(QUEUETYPE& item, TickType_t xTicksToWait) {
-            return xQueueReceive(m_queue, (void*) &item, xTicksToWait);
+            return xQueueReceive(m_queue, static_cast<void*>(&item), xTicksToWait);
         }
 
     private:
@@ -78,6 +56,38 @@ namespace sdk {
      */
     class Component {
     public:
+        /**
+        * @brief Component status order
+        */
+        enum class Status {
+            /**
+             * @brief Like new, `initialize()` will be called by manager
+             */
+            UNINITIALIZED,
+            /**
+             * @brief Working on initialization
+             */
+            INITIALIZING,
+            /**
+             * @brief Nominal running state
+             */
+            RUNNING,
+            /**
+             * @brief Something went wrong during any lower state, manager will try to restart the component
+             */
+            ERROR,
+            /**
+             * @brief State during stopping
+             */
+            STOPPING,
+            /**
+             * @brief State when manually stopped, will not be reinitialized by manager
+             */
+            STOPPED
+        };
+
+        using res = std::expected<Status, std::error_code>;
+
         /***
          * @brief Returns name of the component, for use in logging
          */
@@ -86,12 +96,30 @@ namespace sdk {
         /**
          * @brief Returns component status, may include error
          */
-        virtual res getStatus() = 0;
+        virtual Status getStatus() { return m_status; };
+
+        /**
+         * @brief Gets component error
+         * @return  Nothing when status isn't ERROR, error message when it is
+         */
+        virtual std::optional<etl::string<128>> getError() {
+            if (m_status == Status::ERROR && m_err != ESP_OK) {
+                return esp_err_to_name(m_err);
+            }
+            return {};
+        }
+
+        /**
+         * @brief Check if a component or device restart is required
+         */
+        virtual RestartType getRestartType() {
+            return RestartType::NONE;
+        };
 
         /**
          * @brief Gets called by the manager before startup
          */
-        virtual res initialize() { return ComponentStatus::UNINITIALIZED; };
+        virtual Status initialize() = 0;
 
         /**
          * @brief Gets called by the manager in its' main loop
@@ -100,16 +128,19 @@ namespace sdk {
          *          the component by calling stop(), initialize()
          *          and run().
          */
-        virtual res run() { return ComponentStatus::UNINITIALIZED; };
+        virtual Status run() = 0;
 
 
         /**
          * @brief May be called after the component has returned
          *        an error status, or when the main thread is stopped
          */
-        virtual res stop() = 0;
+        virtual Status stop() = 0;
+    protected:
+        Status                   m_status{Status::UNINITIALIZED};
+        esp_err_t                m_err{ESP_OK};
     };
 
-}; /* namespace sdk */
+} /* namespace sdk */
 
 #endif /* COMPONENTS_HPP */

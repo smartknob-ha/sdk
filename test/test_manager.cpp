@@ -3,28 +3,21 @@
 #include "unity.h"
 #include "../../util/include/esp_system_error.hpp"
 
-sdk::Manager& m = sdk::Manager::instance();
-
 sdk::MockComponent testComponent;
+
+using Status = sdk::Component::Status;
 
 // Repeated for each test
 void setUp() {
     testComponent.reset();
-    m.start();
+    sdk::Manager::start();
 }
 
 // Repeated after each test
 void tearDown() {
-    sdk::Manager::instance().stop();
+    sdk::Manager::stop();
     usleep(200);
     testComponent.reset();
-}
-
-void testInstanceShouldAlwaysReturnSameReference() {
-    sdk::Manager& refFirst  = sdk::Manager::instance();
-    sdk::Manager& refSecond = sdk::Manager::instance();
-
-    TEST_ASSERT_TRUE(&refFirst == &refSecond);
 }
 
 void testAddedComponentShouldBeInitializedAndRan() {
@@ -40,20 +33,17 @@ void testComponentShouldBeRestartedAfterRunError() {
     while (!testComponent.run_called()) {};
 
     // We need to be able to make sure a restart was done
-    testComponent.set_initialize_return({.ok      = true,
-                                         .error = {},
+    testComponent.set_initialize_return({.status = Status::RUNNING,
                                          .called  = false});
 
-    testComponent.set_run_return({.ok      = false,
-                                  .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_run_return({.status = Status::ERROR,
                                   .called  = false});
 
     sleep(1);
 
     while (!testComponent.run_called()) {}
 
-    testComponent.set_run_return({.ok      = true,
-                                  .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_run_return({.status = Status::ERROR,
                                   .called  = false});
 
     sleep(1);
@@ -64,20 +54,17 @@ void testComponentShouldBeRestartedAfterRunError() {
 
 void testComponentShouldBeDisabledAfterStopError() {
     // First setup stop error to prevent race condition
-    testComponent.set_stop_return({.ok      = false,
-                                   .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_stop_return({.status = Status::ERROR,
                                    .called  = false});
 
     // Trigger call to restart_component
-    testComponent.set_run_return({.ok      = false,
-                                  .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_run_return({.status = Status::ERROR,
                                   .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
     while (!testComponent.stop_called()) {}
 
-    testComponent.set_run_return({.ok      = true,
-                                  .error = {},
+    testComponent.set_run_return({.status = Status::RUNNING,
                                   .called  = false});
 
     usleep(200);
@@ -86,19 +73,17 @@ void testComponentShouldBeDisabledAfterStopError() {
 }
 
 void testComponentShouldBeDisabledAfterInitializeError() {
-    m.stop();
+    sdk::Manager::stop();
     sleep(1);
 
-    testComponent.set_initialize_return({.ok      = false,
-                                         .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_initialize_return({.status = Status::ERROR,
                                          .called  = false});
 
     // Set called to false as it may have been set to true already in the thread
-    testComponent.set_run_return({.ok      = true,
-                                  .error = {},
+    testComponent.set_run_return({.status = Status::RUNNING,
                                   .called  = false});
 
-    m.start();
+    sdk::Manager::start();
     sleep(1);
 
     TEST_ASSERT_FALSE(testComponent.run_called());
@@ -106,20 +91,17 @@ void testComponentShouldBeDisabledAfterInitializeError() {
 
 void testComponentShouldBeDisabledAfterInitializeErrorInRestart() {
     // First setup stop error to prevent race condition
-    testComponent.set_initialize_return({.ok      = false,
-                                         .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_initialize_return({.status = Status::ERROR,
                                          .called  = false});
 
     // Trigger call to restart_component
-    testComponent.set_run_return({.ok      = false,
-                                  .error = std::make_error_code(ESP_FAIL),
+    testComponent.set_run_return({.status = Status::ERROR,
                                   .called  = false});
 
     // Make sure we're inside restart_component() and reset run status
     while (!testComponent.stop_called()) {}
 
-    testComponent.set_run_return({.ok      = true,
-                                  .error = {},
+    testComponent.set_run_return({.status = Status::RUNNING,
                                   .called  = false});
 
     sleep(1);
@@ -130,11 +112,10 @@ void testComponentShouldBeDisabledAfterInitializeErrorInRestart() {
 extern "C" {
 
 auto app_main(void) -> int {
-    m.addComponent(testComponent);
+    sdk::Manager::addComponent(testComponent);
 
     UNITY_BEGIN();
 
-    RUN_TEST(testInstanceShouldAlwaysReturnSameReference);
     RUN_TEST(testAddedComponentShouldBeInitializedAndRan);
     RUN_TEST(testComponentShouldBeRestartedAfterRunError);
     RUN_TEST(testComponentShouldBeDisabledAfterStopError);

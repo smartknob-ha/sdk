@@ -15,35 +15,56 @@
 
 namespace sdk {
 
+    using componentEntry = etl::pair<bool, std::reference_wrapper<Component>>;
+
     class Manager {
     public:
-        static Manager& instance();
-
         /**
          * @brief   Use this to add a component to the manager
          * @note    The order in which components are added
          *          determines in what order they will be ran
          */
-        void addComponent(Component& ref);
+        static void addComponent(Component& ref);
 
         /**
          * @brief   Starts a thread on the run function
+         * @note    Only starts once, until `stop()` has been called
          */
-        void start();
+        static void start();
 
         /**
          * @brief   Stops the managers' thread
          */
-        void stop();
+        static void stop();
+
+        /**
+         * @brief Stops the manager and any added components
+         */
+        static void stopAll();
+
+        /**
+         * @brief   Checks initialization status of added components
+         * @return  True when all present components are running
+         */
+        static bool isInitialized();
+
+        /**
+         * @brief Chekcs whether component has been successfully initialized
+         * @param tag Tag of the component to check for
+         * @return Boolean whether initialized if tag was found, otherwise error
+         */
+        static std::expected<bool, esp_err_t> isComponentInitialized(const char* tag);
 
     private:
-        static const inline char TAG[] = "Manager";
+        static constexpr inline char TAG[] = "Manager";
+
+        static inline TaskHandle_t m_taskHandle {NULL};
 
         /**
          * Make sure this class is atomic
          * and non-copyable
          */
-        Manager(void){};
+        Manager(void) {};
         Manager(Manager& other)                     = delete;
         Manager&    operator=(const Manager&)       = delete;
         inline auto operator=(Manager&) -> Manager& = delete;
@@ -53,27 +74,22 @@ namespace sdk {
          *          to keep run all components added
          *          through the addComponent function
          */
-        void run();
+        static void run(void*);
 
         /**
-         * @brief   Used to couple non-static member function run()
-         *          to function pointer for use in FreeRTOS task
+         * @brief Initializes component
+         * @param entry Reference to componentEntry
+         * @returns Whether initialisation completed successfully
          */
-        static void startRun(void*);
-
-        using componentEntry = etl::pair<bool, std::reference_wrapper<Component>>;
+        static bool initComponent(componentEntry& entry);
 
         /**
          * @brief   restartComponent will attempt to restart
          *          a component after its' run() function
          *          has reported a direct error
          */
-        void restartComponent(componentEntry& entry);
-
-        bool                                               m_running = false;
-        etl::vector<componentEntry, CONFIG_NUM_COMPONENTS> m_components;
+        static void restartComponent(componentEntry& entry);
     };
-
 } /* namespace sdk */
 
 #endif /* MANAGER_HPP */
