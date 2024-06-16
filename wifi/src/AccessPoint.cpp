@@ -25,10 +25,6 @@ namespace sdk::wifi {
     using Status = sdk::Component::Status;
     using res    = sdk::Component::res;
 
-    AccessPoint::AccessPoint(Config config) : m_config(config) {
-        eventGroup = xEventGroupCreate();
-    }
-
     Status AccessPoint::run() {
         return m_status;
     }
@@ -95,13 +91,13 @@ namespace sdk::wifi {
 
         wifi_config_t wifiConfig = {
                 .ap = {
-                        .channel        = m_config.channel,
-                        .authmode       = m_config.authmode,
+                        .channel        = CONFIG_AP_CHANNEL,
+                        .authmode       = m_config.authMode,
                         .max_connection = CONFIG_AP_MAX_CONNECTIONS}};
 
         // memcopy to avoid casting errors
-        memcpy(wifiConfig.ap.ssid, m_config.ssid.data(), m_config.ssid.size());
-        memcpy(wifiConfig.ap.password, m_config.pass.data(), m_config.pass.size());
+        memcpy(wifiConfig.ap.ssid, m_config.ssid.value().data(), m_config.ssid.value().size());
+        memcpy(wifiConfig.ap.password, m_config.password.value().data(), m_config.password.value().size());
 
         INIT_RETURN_ON_ERROR(esp_wifi_set_mode(new_mode));
         INIT_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &wifiConfig));
@@ -132,7 +128,7 @@ namespace sdk::wifi {
                 break;
             }
             case WIFI_EVENT_AP_STADISCONNECTED: {
-                ESP_LOGI(TAG, "A client has disconected");
+                ESP_LOGI(TAG, "A client has disconnected");
                 break;
             }
             case WIFI_EVENT_AP_PROBEREQRECVED: {
@@ -144,6 +140,17 @@ namespace sdk::wifi {
                 break;
             }
         }
+    }
+
+    void AccessPoint::setConfig(const nlohmann::json& config) {
+        Config newConfig(config);
+        if (newConfig == m_config) {
+            ESP_LOGD(TAG, "Incoming config is the same, returning");
+            return;
+        }
+        m_config = newConfig;
+        //All config changes require a restart of the component
+        m_restartType = RestartType::COMPONENT;
     }
 
 
