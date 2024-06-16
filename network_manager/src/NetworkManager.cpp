@@ -1,16 +1,16 @@
 #include "NetworkManager.hpp"
 
-#include <regex>
+#include <esp_sntp.h>
+#include <esp_system_error.hpp>
+#include <freertos/FreeRTOS.h>
+#include <lwip/inet.h>
+#include <lwip/sockets.h>
 
-#include "esp_sntp.h"
-#include "esp_system_error.hpp"
-#include "freertos/FreeRTOS.h"
-#include "lwip/inet.h"
-#include "lwip/sockets.h"
+#include <regex>
 
 namespace sdk {
     using Status = Component::Status;
-    using res = Component::res;
+    using res    = Component::res;
 
     Status NetworkManager::run() {
         return Status::RUNNING;
@@ -31,7 +31,11 @@ namespace sdk {
     }
 
     Status NetworkManager::initialize() {
-        //TODO figure out network init cycle
+//        auto stationRet = m_station.initialize();
+
+
+
+
         return Status::RUNNING;
     }
 
@@ -42,8 +46,8 @@ namespace sdk {
             return m_accessPoint.stop();
     }
 
-    void NetworkManager::setAccessPointConfig(wifi::AccessPoint::Config conf) {
-        m_config.ap = conf;
+    void NetworkManager::setAccessPointConfig(const nlohmann::json& config) {
+        m_accessPoint.setConfig(config);
     }
 
     res NetworkManager::setStationState(bool state) {
@@ -57,8 +61,8 @@ namespace sdk {
             return m_station.stop();
     }
 
-    void NetworkManager::setStationConfig(wifi::Station::Config conf) {
-        m_config.sta = conf;
+    void NetworkManager::setStationConfig(const nlohmann::json& config) {
+        m_station.setConfig(config);
     }
 
     res NetworkManager::setIpMode(bool state) {
@@ -77,9 +81,9 @@ namespace sdk {
                 return std::unexpected(std::make_error_code(ret));
             } else {
                 esp_netif_ip_info_t ip4Conf;
-                inet_pton(AF_INET, m_config.ipv4Address.c_str(), &ip4Conf.ip);
-                inet_pton(AF_INET, m_config.ipv4Gateway.c_str(), &ip4Conf.gw);
-                inet_pton(AF_INET, m_config.ipv4Netmask.c_str(), &ip4Conf.netmask);
+                inet_pton(AF_INET, m_config.ipv4Address.value().c_str(), &ip4Conf.ip);
+                inet_pton(AF_INET, m_config.ipv4Gateway.value().c_str(), &ip4Conf.gw);
+                inet_pton(AF_INET, m_config.ipv4Netmask.value().c_str(), &ip4Conf.netmask);
 
                 auto err = std::make_error_code(esp_netif_set_ip_info(m_station.getNetif(), &ip4Conf));
                 if (err) {
@@ -88,7 +92,7 @@ namespace sdk {
                 }
 
                 esp_netif_dns_info_t dnsInfo;
-                inet_pton(AF_INET, m_config.ipv4DnsMain.c_str(), &dnsInfo.ip);
+                inet_pton(AF_INET, m_config.ipv4DnsMain.value().c_str(), &dnsInfo.ip);
                 err = std::make_error_code(esp_netif_set_dns_info(m_station.getNetif(), ESP_NETIF_DNS_MAIN, &dnsInfo));
                 if (err) {
                     ESP_LOGE(TAG, "Error setting static IP: %s", err.message().c_str());
@@ -96,8 +100,8 @@ namespace sdk {
                 }
 
                 // Only set secondary if it has been set
-                if (!m_config.ipv4DnsSecondary.empty()) {
-                    inet_pton(AF_INET, m_config.ipv4DnsSecondary.c_str(), &dnsInfo.ip);
+                if (!m_config.ipv4DnsSecondary.value().empty()) {
+                    inet_pton(AF_INET, m_config.ipv4DnsSecondary.value().c_str(), &dnsInfo.ip);
                     err = std::make_error_code(esp_netif_set_dns_info(m_station.getNetif(), ESP_NETIF_DNS_BACKUP, &dnsInfo));
                     if (err) {
                         ESP_LOGE(TAG, "Error setting static IP: %s", err.message().c_str());
@@ -110,7 +114,7 @@ namespace sdk {
     }
 
     void NetworkManager::initSNTP() {
-        esp_sntp_setservername(0, m_config.sntpHost.c_str());
+        esp_sntp_setservername(0, m_config.sntpHost.value().c_str());
         esp_sntp_init();
     }
 
