@@ -88,7 +88,7 @@ namespace sdk::wifi {
 
         struct WifiRecord {
             etl::string<32> ssid;
-            uint32_t        rssi;
+            int        rssi;
         };
 
         Station() = default;
