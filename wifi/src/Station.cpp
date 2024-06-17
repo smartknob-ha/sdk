@@ -260,7 +260,7 @@ namespace sdk {
             return ip;
         }
 
-        etl::vector<Station::WifiRecord, 15> Station::scan() {
+        etl::vector<Station::WifiRecord, CONFIG_AP_SCAN_NUMBER> Station::scan() {
             if(!m_wifiInitialized){
                 ESP_LOGE(TAG, "Wifi is not initialized, unable to perform scan, returning");
                 return {};
@@ -294,7 +294,7 @@ namespace sdk {
                 scanCount = CONFIG_AP_SCAN_NUMBER;
             }
 
-            etl::vector<WifiRecord, 15> aps;
+            etl::vector<WifiRecord, CONFIG_AP_SCAN_NUMBER> aps;
             ESP_LOGD(TAG, "Found APs:\n");
             for (int i = 0; i < scanCount; i++) {
                 ESP_LOGD(TAG, "\tSSID: %s, RSSI: %d", apRecords[i].ssid, apRecords[i].rssi);
