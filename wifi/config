@@ -15,4 +15,13 @@ menu "Wifi STA"
     config DEFAULT_HOSTNAME
         string "Default hostname"
         default "Smartknob"
+
+    config AP_SCAN_NUMBER
+        int "Number of APs to scan for"
+        default 15
+
+    config STATION_CONNECT_TIMEOUT
+        int "Timeout for blocking connect call, in seconds"
+        default 30
+
 endmenu

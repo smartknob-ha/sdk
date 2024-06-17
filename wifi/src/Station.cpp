@@ -152,7 +152,7 @@ namespace sdk {
                                                    STA_CONNECTED_BIT | STA_DISCONNECTED_BIT,
                                                    pdFALSE,
                                                    pdFALSE,
-                                                   30000 / portTICK_PERIOD_MS); // 30 seconds
+                                                   CONFIG_STATION_CONNECT_TIMEOUT * 1000 / portTICK_PERIOD_MS);
 
             if (bits == STA_CONNECTED_BIT) {
                 return m_wifiStatus;
@@ -242,7 +242,7 @@ namespace sdk {
             m_restartType = RestartType::COMPONENT;
         }
 
-        etl::string<15> Station::getIpInfo() {
+        etl::string<15> Station::getAssignedIp() {
             if (!esp_netif_is_netif_up(m_networkInterface)) {
                 ESP_LOGE(TAG, "Network interface is not up, unable to request IP info");
                 return etl::string<15>();
@@ -258,6 +258,50 @@ namespace sdk {
             esp_ip4addr_ntoa(&ipInfo.ip, ip.data(), ip.max_size());
             ip.repair();
             return ip;
+        }
+
+        etl::vector<Station::WifiRecord, 15> Station::scan() {
+            if(!m_wifiInitialized){
+                ESP_LOGE(TAG, "Wifi is not initialized, unable to perform scan, returning");
+                return {};
+            }
+
+            ESP_LOGD(TAG, "Starting scan...");
+            auto err = esp_wifi_scan_start(NULL, true);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to start scan: %s", esp_err_to_name(err));
+                return {};
+            }
+
+            uint16_t ap_count = 0;
+            err = esp_wifi_scan_get_ap_num(&ap_count);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to get scan count: %s", esp_err_to_name(err));
+                return {};
+            }
+            ESP_LOGD(TAG, "Scan finished; found %d APs", ap_count);
+
+            uint16_t scanCount = CONFIG_AP_SCAN_NUMBER;
+            std::array<wifi_ap_record_t, CONFIG_AP_SCAN_NUMBER> apRecords;
+            err = esp_wifi_scan_get_ap_records(&scanCount, apRecords.data());
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to get scan records: %s", esp_err_to_name(err));
+                return {};
+            }
+
+            if(scanCount > CONFIG_AP_SCAN_NUMBER){
+                ESP_LOGW(TAG, "Scanned more AP than the configured maximum, truncating to %d", CONFIG_AP_SCAN_NUMBER);
+                scanCount = CONFIG_AP_SCAN_NUMBER;
+            }
+
+            etl::vector<WifiRecord, 15> aps;
+            ESP_LOGD(TAG, "Found APs:\n");
+            for (int i = 0; i < scanCount; i++) {
+                ESP_LOGD(TAG, "\tSSID: %s, RSSI: %d", apRecords[i].ssid, apRecords[i].rssi);
+                aps.emplace_back(etl::string<32>(reinterpret_cast<char*>(apRecords[i].ssid), sizeof(apRecords[i].ssid)), apRecords[i].rssi);
+            }
+
+            return aps;
         }
 
         etl::string<90> Station::reasonToString(wifi_err_reason_t reason) {

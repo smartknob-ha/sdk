@@ -40,17 +40,55 @@ namespace sdk::wifi {
             }
         };
 
+        /**
+         * @brief Status codes for the wifi station
+         */
         enum class STATUS {
+            /**
+             * @brief The wifi station is not initialized
+             */
             NOT_RUNNING,
+            /**
+             * @brief To indicate that the configured SSID is empty
+             */
             EMPTY_CONFIG,
+            /**
+             * @brief The wifi station is currently connecting
+             */
             CONNECTING,
+            /**
+             * @brief The wifi station is connected
+             */
             CONNECTED,
+            /**
+             * @brief The wifi station has timed out while connecting
+             */
             TIMED_OUT,
+            /**
+             * @brief The wifi station is disconnected
+             */
             DISCONNECTED,
+            /**
+             * @brief The configured password is invalid
+             */
             INVALID_PASSWORD,
+            /**
+             * @brief The configured SSID is not found
+             */
             AP_NOT_FOUND,
+            /**
+             * @brief The wifi station is currently reconnecting
+             */
             RECONNECTING,
+            /**
+             * @brief The wifi station has encountered an error
+             */
             ERROR
+        };
+
+        struct WifiRecord {
+            etl::string<32> ssid;
+            uint32_t        rssi;
         };
 
         Station() = default;
@@ -62,12 +100,31 @@ namespace sdk::wifi {
         Status run() override;
         Status stop() override;
 
-        STATUS               connect(bool blocking = true);
+        /**
+         * @brief Connects to the configured SSID
+         * @param blocking If true, the function will block until the connection is established, or times out after CONFIG_STATION_CONNECT_TIMEOUT
+         * @return STATUS
+         */
+        STATUS connect(bool blocking = true);
+
         static inline STATUS getWifiStatus() { return m_wifiStatus; };
 
-        esp_netif_t * const getNetif() { return m_networkInterface; };
-        void                     setConfig(const nlohmann::json& config);
-        etl::string<15>          getIpInfo();
+        /**
+         * @brief Scans for available access points
+         * @note This function will block until the scan is complete
+         * @note initialize() must be called before this function
+         * @return etl::vector<WifiRecord, CONFIG_AP_SCAN_NUMBER> Empty vector on error or no APs found
+         */
+        etl::vector<WifiRecord, CONFIG_AP_SCAN_NUMBER> scan();
+
+        esp_netif_t* const getNetif() { return m_networkInterface; };
+        void               setConfig(const nlohmann::json& config);
+
+        /**
+         * @brief Retrieves current assigned IP address
+         * @return etl::string<15> Empty string if no IP assigned
+         */
+        etl::string<15>    getAssignedIp();
 
     private:
         static const inline char TAG[] = "Wifi STA";
@@ -77,7 +134,7 @@ namespace sdk::wifi {
         etl::string<15>      m_assignedIp;
         static inline bool   m_wifiInitialized = false;
         RestartType          m_restartType     = RestartType::NONE;
-        static inline STATUS m_wifiStatus      = STATUS::DISCONNECTED;
+        static inline STATUS m_wifiStatus      = STATUS::NOT_RUNNING;
 
         static etl::string<90> reasonToString(wifi_err_reason_t reason);
 
