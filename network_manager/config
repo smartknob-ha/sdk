@@ -16,6 +16,10 @@ menu "Network Manager"
         string "Default IPv4 DNS"
         default "1.1.1.1"
 
+    config DEFAULT_IP4_DNS_SECONDARY
+        string "Default IPv4 secondary DNS"
+        default ""
+
     config DEFAULT_IP4_AP_GATEWAY
         string "Default IPv4 AP gateway"
         default "192.168.1.1"

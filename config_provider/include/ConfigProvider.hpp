@@ -398,7 +398,10 @@ namespace sdk {
         std::error_code load() {
             ConfigProvider provider(CONFIG_NAMESPACE, true);
             auto           err = provider.initialize();
-            if (err) {
+            if (err.value() == ESP_ERR_NVS_NOT_FOUND) {
+                ESP_LOGW(KEY.c_str(), "No existing config found, using default values");
+                return {};
+            } else if (err) {
                 ESP_LOGE(KEY.c_str(), "Error initializing config: %s", err.message().c_str());
                 return err;
             }
@@ -409,7 +412,7 @@ namespace sdk {
                 m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
             } else {
                 auto app_desc = esp_app_get_description();
-                m_version = semver::from_string(app_desc->version);
+                m_version     = semver::from_string(app_desc->version);
             }
             return err;
         }
@@ -429,11 +432,20 @@ namespace sdk {
          * @brief Constructor to be used for incoming config changes
          * @param data Json object containing changes. Should only contain the fields that need to be updated
          */
-        explicit ConfigObject(nlohmann::json& data) {
+        explicit ConfigObject(const nlohmann::json& data) {
             for (const auto& object: data.items()) {
                 (*m_json)[object.key()] = object.value();
             }
         };
+
+        /**
+         * @brief Equality operator that checks if the underlying json object is the same
+         * @param other ConfigObject to compare with
+         * @return
+         */
+        bool operator==(const ConfigObject& other) const {
+            return m_json == other.m_json;
+        }
 
         /**
          * @brief Constructor that attempts to retrieve itself from NVS and load the fields
@@ -472,9 +484,9 @@ namespace sdk {
             ConfigProvider provider(CONFIG_NAMESPACE, false);
 
             // Update the version field to the current version
-            auto app_desc              = esp_app_get_description();
+            auto app_desc                  = esp_app_get_description();
             m_json->at(CONFIG_VERSION_KEY) = app_desc->version;
-            m_version                  = semver::from_string(app_desc->version);
+            m_version                      = semver::from_string(app_desc->version);
 
             auto err = provider.initialize();
             if (err) {

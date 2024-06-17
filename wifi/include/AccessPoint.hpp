@@ -18,19 +18,35 @@ namespace sdk {
 
         class AccessPoint : public Component {
         public:
-            typedef struct Config {
-                etl::string<31>  ssid;
-                etl::string<63>  pass;
-                wifi_auth_mode_t authmode = WIFI_AUTH_WPA2_PSK;
-                uint8_t          channel  = CONFIG_AP_CHANNEL;
-            } Config;
+            class Config final : public ConfigObject<3, 512, "WIFI AP"> {
+                using Base = ConfigObject<3, 512, "WIFI AP">;
+
+            public:
+                sdk::ConfigField<etl::string<31>>  ssid{"", "ssid", sdk::RestartType::COMPONENT};
+                sdk::ConfigField<etl::string<63>>  password{"", "password", sdk::RestartType::COMPONENT};
+                sdk::ConfigField<wifi_auth_mode_t> authMode{WIFI_AUTH_WPA2_PSK, "hostname", sdk::RestartType::COMPONENT};
+
+                void allocateFields() {
+                    ssid     = allocate(ssid);
+                    password = allocate(password);
+                    authMode = allocate(authMode);
+                }
+
+                Config(const nlohmann::json& data) : Base(data) {
+                    allocateFields();
+                }
+
+                Config() : Base() {
+                    allocateFields();
+                }
+            };
 
             typedef struct Client {
                 etl::string<50> hostname;
                 esp_ip4_addr_t  ip;
             } Client;
 
-            AccessPoint(Config config);
+            AccessPoint() = default;
 
             /* Component override functions */
             virtual etl::string<50> getTag() override { return TAG; };
@@ -41,7 +57,7 @@ namespace sdk {
 
             // Initializes AP but returns while it may not be finished starting up
             res  initialize_non_blocking();
-            void setConfig(Config config) { m_config = config; };
+            void setConfig(const nlohmann::json& config);
 
             // TODO: Implement function
             // etl::vector<ap_client_t, CONFIG_AP_MAX_CONNECTIONS> get_connectedClients();
@@ -53,12 +69,13 @@ namespace sdk {
             etl::vector<Client, CONFIG_AP_MAX_CONNECTIONS> m_connectedClients;
             esp_netif_t*                                   m_espNetif;
             static inline bool                             m_wifiInitialized = false;
+            RestartType                                    m_restartType     = RestartType::NONE;
 
             static void eventHandler(void* arg, esp_event_base_t eventBase, int32_t eventId, void* eventData);
 
             res error_check(esp_err_t err);
 
-            static inline EventGroupHandle_t eventGroup;
+            static inline EventGroupHandle_t eventGroup = xEventGroupCreate();
         };
 
     } /* namespace wifi */
