@@ -485,7 +485,8 @@ namespace sdk {
 
             // Update the version field to the current version
             auto app_desc                  = esp_app_get_description();
-            m_json->at(CONFIG_VERSION_KEY) = app_desc->version;
+
+            (*m_json)[CONFIG_VERSION_KEY] = std::string(app_desc->version);
             m_version                      = semver::from_string(app_desc->version);
 
             auto err = provider.initialize();
