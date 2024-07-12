@@ -39,6 +39,7 @@ namespace nlohmann {
 namespace sdk {
 
     using ConfigKey = etl::string<NVS_NS_NAME_MAX_SIZE>;
+    using keyHash = size_t;
 
     class ConfigProvider {
     private:
@@ -387,7 +388,10 @@ namespace sdk {
         semver::version m_version;
 
         // Map to store the restart required status of each field
-        etl::unordered_map<size_t, RestartType, NUM_ITEMS> m_restartRequiredMap{};
+        etl::unordered_map<keyHash, RestartType, NUM_ITEMS> m_restartRequiredMap{};
+
+        // Map to store pointers to ConfigObject fields, accessed using hash
+        etl::unordered_map<keyHash, void*, NUM_ITEMS> m_fieldPointers{};
 
         nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(m_buffer);
 
@@ -455,6 +459,23 @@ namespace sdk {
         }
 
         /**
+         * @brief Updates a ConfigObject field by replacing it
+         * @tparam T ConfigField type
+         * @param field Field that needs updating
+         * @param newValue New value to go in the updated field
+         */
+        template<typename T>
+        void updateField(const ConfigField<T> &field, const T &newValue) {
+            auto location = m_fieldPointers.find(hash(field.key()));
+            assert (location != m_fieldPointers.end() && "Don't update a nonexistent field");
+            auto foundField = static_cast<ConfigField<T>*>(location->second);
+            ConfigField<T> newField{newValue, field.key(), field.restartType()};
+
+            *foundField = newField;
+            m_json->at(field.key().c_str()) = newValue;
+        }
+
+        /**
          * @brief Allocates a field in the json object
          * @tparam T Type of the field
          * @param field Field to allocate, if it already exists in NVS, the default value of field will be overwritten
@@ -462,7 +483,9 @@ namespace sdk {
          */
         template<typename T>
         ConfigField<T> allocate(ConfigField<T>& field) {
-            m_restartRequiredMap[hash(field.key())] = field.restartType();
+            size_t fieldNameHash = hash(field.key());
+            m_restartRequiredMap[fieldNameHash] = field.restartType();
+            m_fieldPointers[fieldNameHash] = static_cast<void*>(&field);
 
             if (!m_json->contains(field.key().c_str())) {
                 assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
