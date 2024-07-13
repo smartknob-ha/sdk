@@ -426,7 +426,7 @@ namespace sdk {
          * @param key Key to hash
          * @return Hash of the key
          */
-        size_t hash(ConfigKey key) {
+        keyHash hash(ConfigKey key) {
             etl::hash<etl::string<NVS_KEY_NAME_MAX_SIZE>> hasher;
             return hasher(key);
         }
@@ -483,7 +483,7 @@ namespace sdk {
          */
         template<typename T>
         ConfigField<T> allocate(ConfigField<T>& field) {
-            size_t fieldNameHash = hash(field.key());
+            keyHash fieldNameHash = hash(field.key());
             m_restartRequiredMap[fieldNameHash] = field.restartType();
             m_fieldPointers[fieldNameHash] = static_cast<void*>(&field);
 
