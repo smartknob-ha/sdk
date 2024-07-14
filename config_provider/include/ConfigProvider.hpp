@@ -523,6 +523,21 @@ namespace sdk {
             return err;
         }
 
+        std::error_code reset() {
+            ConfigProvider provider(CONFIG_NAMESPACE, false);
+            auto err = provider.initialize();
+            if (err) {
+                return err;
+            }
+
+            err = provider.eraseItem(KEY.c_str(), true);
+            if (err) {
+                ESP_LOGE(KEY.c_str(), "Error resetting config: %s", err.message().c_str());
+            }
+
+            return std::make_error_code(ESP_OK);
+        }
+
         /**
          * @brief Check if a device restart is required based on the fields in the json object
          * @param json Json object to check
