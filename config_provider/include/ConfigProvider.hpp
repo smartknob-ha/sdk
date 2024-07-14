@@ -387,6 +387,8 @@ namespace sdk {
 
         semver::version m_version;
 
+        bool m_isDefault {true};
+
         // Map to store the restart required status of each field
         etl::unordered_map<keyHash, RestartType, NUM_ITEMS> m_restartRequiredMap{};
 
@@ -417,6 +419,9 @@ namespace sdk {
             } else {
                 auto app_desc = esp_app_get_description();
                 m_version     = semver::from_string(app_desc->version);
+
+                // If the json was not retrieved from NVS, ConfigObject will only contain default values
+                m_isDefault = false;
             }
             return err;
         }
@@ -487,7 +492,7 @@ namespace sdk {
             m_restartRequiredMap[fieldNameHash] = field.restartType();
             m_fieldPointers[fieldNameHash] = static_cast<void*>(&field);
 
-            if (!m_json->contains(field.key().c_str())) {
+            if (!m_json->empty() && !m_json->contains(field.key().c_str())) {
                 assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
                 m_json->emplace(field.key().c_str(), field.value());
 
@@ -520,7 +525,8 @@ namespace sdk {
             if (err) {
                 ESP_LOGE(KEY.c_str(), "Error saving config: %s", err.message().c_str());
             }
-            return err;
+
+            return std::make_error_code(ESP_OK);
         }
 
         std::error_code reset() {
@@ -536,6 +542,10 @@ namespace sdk {
             }
 
             return std::make_error_code(ESP_OK);
+        }
+
+        bool isDefault() {
+            return m_isDefault;
         }
 
         /**
