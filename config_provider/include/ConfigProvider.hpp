@@ -492,7 +492,7 @@ namespace sdk {
             m_restartRequiredMap[fieldNameHash] = field.restartType();
             m_fieldPointers[fieldNameHash] = static_cast<void*>(&field);
 
-            if (!m_json->empty() && !m_json->contains(field.key().c_str())) {
+            if (!m_json->contains(field.key().c_str())) {
                 assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
                 m_json->emplace(field.key().c_str(), field.value());
 
