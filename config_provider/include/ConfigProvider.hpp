@@ -148,6 +148,7 @@ namespace sdk {
             err = std::make_error_code(m_handle->get_string(key.c_str(), &buffer[0], storedSize));
             if (err) {
                 ESP_LOGE(TAG, "Error loading string: %s, err: %s", key.c_str(), err.message().c_str());
+                return err;
             } else {
                 string.assign(buffer);
             }
@@ -167,10 +168,9 @@ namespace sdk {
             etl::string<BUFFER_SIZE> buffer;
 
             auto err = loadItem(key, buffer);
-            if (err) {
-                return err;
+            if (!err) {
+                json = nlohmann::json::parse(buffer);
             }
-            json = nlohmann::json::parse(buffer);
             return err;
         }
 
@@ -413,6 +413,9 @@ namespace sdk {
             }
             err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json);
 
+            // If the json was not retrieved from NVS, ConfigObject will only contain default values
+            m_isDefault = m_json->empty();
+
             // If the version field is not found, set it to the current version
             if (!err && m_json->contains(CONFIG_VERSION_KEY)) {
                 m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
@@ -420,8 +423,7 @@ namespace sdk {
                 auto app_desc = esp_app_get_description();
                 m_version     = semver::from_string(app_desc->version);
 
-                // If the json was not retrieved from NVS, ConfigObject will only contain default values
-                m_isDefault = false;
+
             }
             return err;
         }
@@ -529,21 +531,28 @@ namespace sdk {
             return std::make_error_code(ESP_OK);
         }
 
+        /**
+         * @brief Deletes this ConfigObject from NVS
+         * @return Error on failure to delete
+         */
         std::error_code reset() {
             ConfigProvider provider(CONFIG_NAMESPACE, false);
-            auto err = provider.initialize();
-            if (err) {
+            if (auto err = provider.initialize()) {
                 return err;
             }
 
-            err = provider.eraseItem(KEY.c_str(), true);
-            if (err) {
+            if (auto err = provider.eraseItem(KEY.c_str(), true)) {
                 ESP_LOGE(KEY.c_str(), "Error resetting config: %s", err.message().c_str());
+                return err;
             }
 
             return std::make_error_code(ESP_OK);
         }
 
+        /**
+         * @brief Whether the ConfigObject hasn't been saved to NVS before, and is thus using default values
+         * @return True when the ConfigObject isn't loaded from NVS, false when it is
+         */
         bool isDefault() {
             return m_isDefault;
         }
