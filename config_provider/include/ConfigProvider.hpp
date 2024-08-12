@@ -122,6 +122,7 @@ namespace sdk {
 
             if (auto err = std::make_error_code(m_handle->get_item(key.c_str(), item))) {
                 ESP_LOGE(TAG, "Error loading item: %s, err: %s", key.c_str(), err.message().c_str());
+                return err;
             }
             return {};
         }
@@ -163,9 +164,10 @@ namespace sdk {
         std::error_code loadJson(const ConfigKey key, nlohmann::json& json) {
             assert(m_handle != nullptr && "Call initialize() first");
             etl::string<BUFFER_SIZE> buffer;
-            if (auto err = loadItem(key, buffer); !err) {
-                json = nlohmann::json::parse(buffer);
+            if (auto err = loadItem(key, buffer)) {
+                return err;
             }
+            json = nlohmann::json::parse(buffer);
             return {};
         }
 
@@ -261,6 +263,7 @@ namespace sdk {
             assert(!m_readOnly && "Unable to erase if NVS is opened in READONLY mode");
             if (auto err = std::make_error_code(m_handle->erase_all())) {
                 ESP_LOGE(TAG, "Error erasing namespace %s: %s", m_namespace.c_str(), err.message().c_str());
+                return err;
             }
             return {};
         }
@@ -274,6 +277,7 @@ namespace sdk {
             assert(!m_readOnly && "Unable to commit if NVS is opened in READONLY mode");
             if (auto err = std::make_error_code(m_handle->commit())) {
                 ESP_LOGE(TAG, "Error committing changes: %s", err.message().c_str());
+                return err;
             }
             return {};
         }
@@ -405,7 +409,9 @@ namespace sdk {
             }
 
             // If the version field is not found, set it to the current version
-            if (auto err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json); !err && m_json->contains(CONFIG_VERSION_KEY)) {
+            if (auto err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json)) {
+                return err;
+            } else if (m_json->contains(CONFIG_VERSION_KEY)) {
                 m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
             } else {
                 auto app_desc = esp_app_get_description();
@@ -530,6 +536,7 @@ namespace sdk {
             }
             if (auto err = provider.saveJson(KEY.c_str(), *m_json, true)) {
                 ESP_LOGE(KEY.c_str(), "Error saving config: %s", err.message().c_str());
+                return err;
             }
 
             return {};
