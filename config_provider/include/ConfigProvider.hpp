@@ -376,9 +376,7 @@ namespace sdk {
     class ConfigObject {
     private:
         // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
-        //        char m_buffer[BUFFER_SIZE]{0};
-
-        std::array<char, BUFFER_SIZE> m_buffer{0};
+        std::array<char, BUFFER_SIZE> m_buffer;
 
         semver::version m_version;
 
@@ -391,7 +389,7 @@ namespace sdk {
         etl::unordered_map<keyHash, void*, NUM_ITEMS> m_fieldPointers{};
 
         // Use JSON with static buffer
-        nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(m_buffer.data());
+        nlohmann::json* m_json;
 
         /**
          * @brief Retrieves itself from NVS
@@ -419,10 +417,19 @@ namespace sdk {
             }
 
 #ifdef DEBUG_BUILD
-            auto size = m_json->size();
+            //            auto size = m_json->;
+
+            //            etl::string<BUFFER_SIZE> tempString{m_buffer.data()};
+            //            tempString.repair();
+            auto pos = std::find_if(m_buffer.rbegin(), m_buffer.rend(), [](const char& letter) {
+                return letter != 0;
+            });
+
+            auto size = std::distance(m_buffer.rbegin(), pos);
+            ESP_LOGI(KEY.c_str(), "Current JSON buffer has been filled by %d out of %d", size, BUFFER_SIZE);
             if (size >= BUFFER_SIZE - 50) {
                 ESP_LOGW(KEY.c_str(), "There are only %d bytes left in the JSON buffer", BUFFER_SIZE - size);
-            } else if (size <= BUFFER_SIZE - 512) {
+            } else if (size <= BUFFER_SIZE / 2) {
                 ESP_LOGW(KEY.c_str(), "Comically large JSON buffer, there are %d bytes left", BUFFER_SIZE - size);
             }
 #endif
@@ -446,9 +453,9 @@ namespace sdk {
          * @param data Json object containing changes. Should only contain the fields that need to be updated
          */
         explicit ConfigObject(const nlohmann::json& data) {
-            for (const auto& object: data.items()) {
-                (*m_json)[object.key()] = object.value();
-            }
+            m_buffer.fill('\0');
+            m_json = reinterpret_cast<nlohmann::json*>(m_buffer.data());
+            for (const auto& object: data.items()) { (*m_json)[object.key()] = object.value(); }
         };
 
         /**
@@ -464,6 +471,8 @@ namespace sdk {
          * @brief Constructor that attempts to retrieve itself from NVS and load the fields
          */
         ConfigObject() {
+            m_buffer.fill('\0');
+            m_json = reinterpret_cast<nlohmann::json*>(m_buffer.data());
             load();
         }
 
