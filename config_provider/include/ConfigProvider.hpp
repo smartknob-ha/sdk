@@ -376,7 +376,7 @@ namespace sdk {
     class ConfigObject {
     private:
         // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
-        std::array<char, BUFFER_SIZE> m_buffer;
+//        std::array<char, BUFFER_SIZE> m_buffer;
 
         semver::version m_version;
 
@@ -389,7 +389,7 @@ namespace sdk {
         etl::unordered_map<keyHash, void*, NUM_ITEMS> m_fieldPointers{};
 
         // Use JSON with static buffer
-        nlohmann::json* m_json;
+        nlohmann::json m_json;
 
         /**
          * @brief Retrieves itself from NVS
@@ -407,31 +407,17 @@ namespace sdk {
             }
 
             // If the version field is not found, set it to the current version
-            if (auto err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json)) {
+            if (auto err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), m_json)) {
                 return err;
-            } else if (m_json->contains(CONFIG_VERSION_KEY)) {
-                m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
+            } else if (m_json.contains(CONFIG_VERSION_KEY)) {
+                m_version = semver::from_string(m_json.at(CONFIG_VERSION_KEY).get<std::string>());
             } else {
                 auto app_desc = esp_app_get_description();
                 m_version     = semver::from_string(app_desc->version);
             }
 
 #ifdef DEBUG_BUILD
-            //            auto size = m_json->;
-
-            //            etl::string<BUFFER_SIZE> tempString{m_buffer.data()};
-            //            tempString.repair();
-            auto pos = std::find_if(m_buffer.rbegin(), m_buffer.rend(), [](const char& letter) {
-                return letter != 0;
-            });
-
-            auto size = std::distance(m_buffer.rbegin(), pos);
-            ESP_LOGI(KEY.c_str(), "Current JSON buffer has been filled by %d out of %d", size, BUFFER_SIZE);
-            if (size >= BUFFER_SIZE - 50) {
-                ESP_LOGW(KEY.c_str(), "There are only %d bytes left in the JSON buffer", BUFFER_SIZE - size);
-            } else if (size <= BUFFER_SIZE / 2) {
-                ESP_LOGW(KEY.c_str(), "Comically large JSON buffer, there are %d bytes left", BUFFER_SIZE - size);
-            }
+            // TODO: json buffer size check warning
 #endif
 
             return {};
@@ -453,9 +439,7 @@ namespace sdk {
          * @param data Json object containing changes. Should only contain the fields that need to be updated
          */
         explicit ConfigObject(const nlohmann::json& data) {
-            m_buffer.fill('\0');
-            m_json = reinterpret_cast<nlohmann::json*>(m_buffer.data());
-            for (const auto& object: data.items()) { (*m_json)[object.key()] = object.value(); }
+            for (const auto& object: data.items()) { m_json[object.key()] = object.value(); }
         };
 
         /**
@@ -471,8 +455,6 @@ namespace sdk {
          * @brief Constructor that attempts to retrieve itself from NVS and load the fields
          */
         ConfigObject() {
-            m_buffer.fill('\0');
-            m_json = reinterpret_cast<nlohmann::json*>(m_buffer.data());
             load();
         }
 
@@ -494,7 +476,7 @@ namespace sdk {
             }
 
             *foundField                     = newField;
-            m_json->at(field.key().c_str()) = newValue;
+            m_json.at(field.key().c_str()) = newValue;
         }
 
         /**
@@ -509,14 +491,14 @@ namespace sdk {
             m_restartRequiredMap[fieldNameHash] = field.restartType();
             m_fieldPointers[fieldNameHash]      = static_cast<void*>(&field);
 
-            if (!m_json->contains(field.key().c_str())) {
-                assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
-                m_json->emplace(field.key().c_str(), field.value());
+            if (!m_json.contains(field.key().c_str())) {
+                assert(m_json.size() + sizeof(field) < BUFFER_SIZE);
+                m_json.emplace(field.key().c_str(), field.value());
 
                 // ConfigField is immutable, so return a new object
                 return ConfigField<T>{field.value(), field.key(), field.restartType()};
             } else {
-                T    retrieved_value = m_json->value(static_cast<const char*>(field.key().c_str()), field.value());
+                T    retrieved_value = m_json.value(static_cast<const char*>(field.key().c_str()), field.value());
                 auto newField        = ConfigField<T>{retrieved_value, field.key(), field.restartType()};
 
                 if (field.value() != newField.value()) {
@@ -537,13 +519,13 @@ namespace sdk {
             // Update the version field to the current version
             auto app_desc = esp_app_get_description();
 
-            (*m_json)[CONFIG_VERSION_KEY] = std::string(app_desc->version);
+            m_json[CONFIG_VERSION_KEY] = std::string(app_desc->version);
             m_version                     = semver::from_string(app_desc->version);
 
             if (auto err = provider.initialize()) {
                 return err;
             }
-            if (auto err = provider.saveJson(KEY.c_str(), *m_json, true)) {
+            if (auto err = provider.saveJson(KEY.c_str(), m_json, true)) {
                 ESP_LOGE(KEY.c_str(), "Error saving config: %s", err.message().c_str());
                 return err;
             }
