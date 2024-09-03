@@ -39,7 +39,7 @@ namespace nlohmann {
 namespace sdk {
 
     using ConfigKey = etl::string<NVS_NS_NAME_MAX_SIZE>;
-    using keyHash = size_t;
+    using keyHash   = size_t;
 
     class ConfigProvider {
     private:
@@ -120,11 +120,11 @@ namespace sdk {
         std::error_code loadItem(const ConfigKey key, T& item) {
             assert(m_handle != nullptr && "Call initialize() first");
 
-            auto err = std::make_error_code(m_handle->get_item(key.c_str(), item));
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->get_item(key.c_str(), item))) {
                 ESP_LOGE(TAG, "Error loading item: %s, err: %s", key.c_str(), err.message().c_str());
+                return err;
             }
-            return err;
+            return {};
         }
 
         /**
@@ -139,19 +139,18 @@ namespace sdk {
             assert(m_handle != nullptr && "Call initialize() first");
             size_t storedSize = 0;
 
-            auto err = getStringSize(key, storedSize);
-            if (err) {
+            if (auto err = getStringSize(key, storedSize)) {
                 return err;
             }
             assert(LENGTH >= storedSize && "LENGTH too small");
             char buffer[LENGTH];
-            err = std::make_error_code(m_handle->get_string(key.c_str(), &buffer[0], storedSize));
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->get_string(key.c_str(), &buffer[0], storedSize))) {
                 ESP_LOGE(TAG, "Error loading string: %s, err: %s", key.c_str(), err.message().c_str());
+                return err;
             } else {
                 string.assign(buffer);
             }
-            return err;
+            return {};
         }
 
         /**
@@ -165,13 +164,11 @@ namespace sdk {
         std::error_code loadJson(const ConfigKey key, nlohmann::json& json) {
             assert(m_handle != nullptr && "Call initialize() first");
             etl::string<BUFFER_SIZE> buffer;
-
-            auto err = loadItem(key, buffer);
-            if (err) {
+            if (auto err = loadItem(key, buffer)) {
                 return err;
             }
             json = nlohmann::json::parse(buffer);
-            return err;
+            return {};
         }
 
         /**
@@ -186,15 +183,14 @@ namespace sdk {
         std::error_code saveItem(const ConfigKey key, T& item, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!m_readOnly && "Unable to save if NVS is opened in READONLY mode");
-            auto err = std::make_error_code(m_handle->set_item(key.c_str(), item));
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->set_item(key.c_str(), item))) {
                 ESP_LOGE(TAG, "Error saving item %s: %s", key.c_str(), err.message().c_str());
                 return err;
             }
             if (commit) {
                 return this->commit();
             }
-            return err;
+            return {};
         }
 
         /**
@@ -209,15 +205,14 @@ namespace sdk {
         std::error_code saveItem(const ConfigKey key, const etl::string<LENGTH>& string, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!m_readOnly && "Unable to save if NVS is opened in READONLY mode");
-            auto err = std::make_error_code(m_handle->set_string(key.c_str(), string.c_str()));
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->set_string(key.c_str(), string.c_str()))) {
                 ESP_LOGE(TAG, "Error saving string %s: %s", key.c_str(), err.message().c_str());
                 return err;
             }
             if (commit) {
                 return this->commit();
             }
-            return err;
+            return {};
         }
 
         /**
@@ -230,15 +225,14 @@ namespace sdk {
         std::error_code saveJson(const ConfigKey key, const nlohmann::json& json, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!m_readOnly && "Unable to save if NVS is opened in READONLY mode");
-            auto err = std::make_error_code(m_handle->set_string(key.c_str(), json.dump().c_str()));
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->set_string(key.c_str(), json.dump().c_str()))) {
                 ESP_LOGE(TAG, "Error saving json %s: %s", key.c_str(), err.message().c_str());
                 return err;
             }
             if (commit) {
                 return this->commit();
             }
-            return err;
+            return {};
         }
 
         /**
@@ -250,15 +244,14 @@ namespace sdk {
         std::error_code eraseItem(const etl::string<NVS_KEY_NAME_MAX_SIZE>& key, bool commit = true) {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!m_readOnly && "Unable to erase if NVS is opened in READONLY mode");
-            auto err = std::make_error_code(m_handle->erase_item(key.c_str()));
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->erase_item(key.c_str()))) {
                 ESP_LOGE(TAG, "Error erasing item %s: %s", key.c_str(), err.message().c_str());
                 return err;
             }
             if (commit) {
                 return this->commit();
             }
-            return err;
+            return {};
         }
 
         /**
@@ -268,11 +261,11 @@ namespace sdk {
         std::error_code erase() {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!m_readOnly && "Unable to erase if NVS is opened in READONLY mode");
-            auto err = std::make_error_code(m_handle->erase_all());
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->erase_all())) {
                 ESP_LOGE(TAG, "Error erasing namespace %s: %s", m_namespace.c_str(), err.message().c_str());
+                return err;
             }
-            return err;
+            return {};
         }
 
         /**
@@ -282,11 +275,11 @@ namespace sdk {
         std::error_code commit() {
             assert(m_handle != nullptr && "Call initialize() first");
             assert(!m_readOnly && "Unable to commit if NVS is opened in READONLY mode");
-            auto err = std::make_error_code(m_handle->commit());
-            if (err) {
+            if (auto err = std::make_error_code(m_handle->commit())) {
                 ESP_LOGE(TAG, "Error committing changes: %s", err.message().c_str());
+                return err;
             }
-            return err;
+            return {};
         }
     };
 
@@ -382,10 +375,9 @@ namespace sdk {
     template<size_t NUM_ITEMS, size_t BUFFER_SIZE, StringLiteral KEY>
     class ConfigObject {
     private:
-        // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
-        char m_buffer[BUFFER_SIZE]{0};
-
         semver::version m_version;
+
+        bool m_isDefault{true};
 
         // Map to store the restart required status of each field
         etl::unordered_map<keyHash, RestartType, NUM_ITEMS> m_restartRequiredMap{};
@@ -393,7 +385,8 @@ namespace sdk {
         // Map to store pointers to ConfigObject fields, accessed using hash
         etl::unordered_map<keyHash, void*, NUM_ITEMS> m_fieldPointers{};
 
-        nlohmann::json* m_json = reinterpret_cast<nlohmann::json*>(m_buffer);
+        // Use JSON with static buffer
+        nlohmann::json m_json;
 
         /**
          * @brief Retrieves itself from NVS
@@ -401,24 +394,30 @@ namespace sdk {
          */
         std::error_code load() {
             ConfigProvider provider(CONFIG_NAMESPACE, true);
-            auto           err = provider.initialize();
-            if (err.value() == ESP_ERR_NVS_NOT_FOUND) {
+
+            if (auto err = provider.initialize(); err.value() == ESP_ERR_NVS_NOT_FOUND) {
                 ESP_LOGW(KEY.c_str(), "No existing config found, using default values");
                 return {};
             } else if (err) {
                 ESP_LOGE(KEY.c_str(), "Error initializing config: %s", err.message().c_str());
                 return err;
             }
-            err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), *m_json);
 
             // If the version field is not found, set it to the current version
-            if (!err && m_json->contains(CONFIG_VERSION_KEY)) {
-                m_version = semver::from_string(m_json->at(CONFIG_VERSION_KEY).get<std::string>());
+            if (auto err = provider.loadJson<BUFFER_SIZE>(KEY.c_str(), m_json)) {
+                return err;
+            } else if (m_json.contains(CONFIG_VERSION_KEY)) {
+                m_version = semver::from_string(m_json.at(CONFIG_VERSION_KEY).get<std::string>());
             } else {
                 auto app_desc = esp_app_get_description();
                 m_version     = semver::from_string(app_desc->version);
             }
-            return err;
+
+#ifdef DEBUG_BUILD
+            // TODO: json buffer size check warning
+#endif
+
+            return {};
         }
 
         /**
@@ -437,9 +436,7 @@ namespace sdk {
          * @param data Json object containing changes. Should only contain the fields that need to be updated
          */
         explicit ConfigObject(const nlohmann::json& data) {
-            for (const auto& object: data.items()) {
-                (*m_json)[object.key()] = object.value();
-            }
+            for (const auto& object: data.items()) { m_json[object.key()] = object.value(); }
         };
 
         /**
@@ -465,14 +462,18 @@ namespace sdk {
          * @param newValue New value to go in the updated field
          */
         template<typename T>
-        void updateField(const ConfigField<T> &field, const T &newValue) {
+        void updateField(const ConfigField<T>& field, const T& newValue) {
             auto location = m_fieldPointers.find(hash(field.key()));
-            assert (location != m_fieldPointers.end() && "Don't update a nonexistent field");
-            auto foundField = static_cast<ConfigField<T>*>(location->second);
+            assert(location != m_fieldPointers.end() && "Don't update a nonexistent field");
+            auto           foundField = static_cast<ConfigField<T>*>(location->second);
             ConfigField<T> newField{newValue, field.key(), field.restartType()};
 
-            *foundField = newField;
-            m_json->at(field.key().c_str()) = newValue;
+            if (foundField->value() != newValue) {
+                m_isDefault = false;
+            }
+
+            *foundField                     = newField;
+            m_json.at(field.key().c_str()) = newValue;
         }
 
         /**
@@ -483,19 +484,25 @@ namespace sdk {
          */
         template<typename T>
         ConfigField<T> allocate(ConfigField<T>& field) {
-            keyHash fieldNameHash = hash(field.key());
+            keyHash fieldNameHash               = hash(field.key());
             m_restartRequiredMap[fieldNameHash] = field.restartType();
-            m_fieldPointers[fieldNameHash] = static_cast<void*>(&field);
+            m_fieldPointers[fieldNameHash]      = static_cast<void*>(&field);
 
-            if (!m_json->contains(field.key().c_str())) {
-                assert(m_json->size() + sizeof(field) < BUFFER_SIZE);
-                m_json->emplace(field.key().c_str(), field.value());
+            if (!m_json.contains(field.key().c_str())) {
+                assert(m_json.size() + sizeof(field) < BUFFER_SIZE);
+                m_json.emplace(field.key().c_str(), field.value());
 
                 // ConfigField is immutable, so return a new object
                 return ConfigField<T>{field.value(), field.key(), field.restartType()};
             } else {
-                T retrieved_value = m_json->value(static_cast<const char*>(field.key().c_str()), field.value());
-                return ConfigField<T>{retrieved_value, field.key(), field.restartType()};
+                T    retrieved_value = m_json.value(static_cast<const char*>(field.key().c_str()), field.value());
+                auto newField        = ConfigField<T>{retrieved_value, field.key(), field.restartType()};
+
+                if (field.value() != newField.value()) {
+                    m_isDefault = false;
+                }
+
+                return newField;
             }
         };
 
@@ -507,20 +514,46 @@ namespace sdk {
             ConfigProvider provider(CONFIG_NAMESPACE, false);
 
             // Update the version field to the current version
-            auto app_desc                  = esp_app_get_description();
+            auto app_desc = esp_app_get_description();
 
-            (*m_json)[CONFIG_VERSION_KEY] = std::string(app_desc->version);
-            m_version                      = semver::from_string(app_desc->version);
+            m_json[CONFIG_VERSION_KEY] = std::string(app_desc->version);
+            m_version                     = semver::from_string(app_desc->version);
 
-            auto err = provider.initialize();
-            if (err) {
+            if (auto err = provider.initialize()) {
                 return err;
             }
-            err = provider.saveJson(KEY.c_str(), *m_json, true);
-            if (err) {
+            if (auto err = provider.saveJson(KEY.c_str(), m_json, true)) {
                 ESP_LOGE(KEY.c_str(), "Error saving config: %s", err.message().c_str());
+                return err;
             }
-            return err;
+
+            return {};
+        }
+
+        /**
+         * @brief Deletes this ConfigObject from NVS
+         * @return Error on failure to delete
+         */
+        std::error_code reset() {
+            ConfigProvider provider(CONFIG_NAMESPACE, false);
+            if (auto err = provider.initialize()) {
+                return err;
+            }
+
+            if (auto err = provider.eraseItem(KEY.c_str(), true)) {
+                ESP_LOGE(KEY.c_str(), "Error resetting config: %s", err.message().c_str());
+                return err;
+            }
+
+            return {};
+        }
+
+        /**
+         * @brief Whether any of the config fields has its factory value
+         * @return True when any field has the same value as defined in firmware
+         */
+        bool isDefault() {
+            return m_isDefault;
         }
 
         /**
@@ -574,8 +607,7 @@ namespace sdk {
          */
         static size_t getStoredSize() {
             ConfigProvider provider(CONFIG_NAMESPACE, false);
-            auto           err = provider.initialize();
-            if (err) {
+            if (auto err = provider.initialize()) {
                 return 0;
             }
             size_t size = 0;
