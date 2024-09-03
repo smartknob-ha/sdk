@@ -375,9 +375,6 @@ namespace sdk {
     template<size_t NUM_ITEMS, size_t BUFFER_SIZE, StringLiteral KEY>
     class ConfigObject {
     private:
-        // Buffer to store the json object. This is a workaround to avoid dynamic memory allocation
-//        std::array<char, BUFFER_SIZE> m_buffer;
-
         semver::version m_version;
 
         bool m_isDefault{true};
