@@ -66,7 +66,7 @@ namespace sdk::Http {
          * @param userContext Any user context that was passed when registering the callback. Will be nullptr if not provided.
          */
         template<std::size_t N_PARAMETERS, std::size_t SIZE_RETURN, std::size_t SIZE_BODY>
-        using PostCallback = std::function<std::expected<etl::string<SIZE_RETURN>, Error>(const Uri& uri, etl::string<SIZE_BODY>& body, const etl::unordered_map<QueryKey, QueryValue, N_PARAMETERS>& parameters, void* userContext)>;
+        using PostCallback = std::function<std::expected<etl::string<SIZE_RETURN>, Error>(const Uri& uri, const etl::string<SIZE_BODY>& body, const etl::unordered_map<QueryKey, QueryValue, N_PARAMETERS>& parameters, void* userContext)>;
 
         explicit Server(const httpd_config_t& config = HTTPD_DEFAULT_CONFIG()) : m_config(config) {}
 
