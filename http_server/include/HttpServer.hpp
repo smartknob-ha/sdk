@@ -18,8 +18,6 @@ namespace sdk::Http {
 
     class Server final : public Component {
     public:
-        static constexpr std::size_t MAX_QUERY_SIZE = 128;
-
         typedef esp_err_t (*RawHandler)(httpd_req_t*);
 
         using SendHeader = std::pair<etl::string<32>, etl::string<128>>;
