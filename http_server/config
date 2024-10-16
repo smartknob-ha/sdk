@@ -1,0 +1,7 @@
+menu "HTTP Server"
+
+    config RETRIEVE_BODY_TIMEOUT_RETRY_COUNT
+        int "Number of times the HTTP server will retry to retrieve the body of a request on a timeout"
+        default 5
+
+endmenu
