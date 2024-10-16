@@ -364,7 +364,8 @@ namespace sdk::Http {
             }
 
             std::array<char, N> body;
-            while (1) {
+
+            for(int i = 0; i < CONFIG_RETRIEVE_BODY_TIMEOUT_RETRY_COUNT; i++) {
                 auto retrieved = httpd_req_recv(req, body.data(), std::min(req->content_len, body.size()));
                 if (retrieved > 0) {
                     if (retrieved < N) {
@@ -379,6 +380,7 @@ namespace sdk::Http {
                 }
                 return std::unexpected(retrieved);
             }
+            return std::unexpected(HTTPD_SOCK_ERR_TIMEOUT);
         }
     };
 
