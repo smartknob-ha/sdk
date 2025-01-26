@@ -57,7 +57,7 @@ namespace sdk {
 
             // Initializes AP but returns while it may not be finished starting up
             res  initialize_non_blocking();
-            void setConfig(const nlohmann::json& config);
+            void setConfig(const nlohmann::json& config, bool saveConfig = true);
 
             // TODO: Implement function
             // etl::vector<ap_client_t, CONFIG_AP_MAX_CONNECTIONS> get_connectedClients();

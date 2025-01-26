@@ -18,10 +18,13 @@ namespace sdk {
     void Manager::start() {
         if (!m_running) {
             m_running = true;
-            auto res = xTaskCreate(Manager::run, "manager", CONFIG_RUN_TASK_STACK_SIZE, nullptr, 1, &m_taskHandle);
+            auto res  = xTaskCreate(Manager::run, "manager", CONFIG_RUN_TASK_STACK_SIZE, nullptr, 1, &m_taskHandle);
             if (res != pdPASS) {
                 ESP_LOGE(TAG, "Failed to create manager thread, error code: %d", res);
             }
+        }
+        if (const auto err = esp_register_shutdown_handler(shutdownHandler); err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to register shutdown handler: %s", esp_err_to_name(err));
         }
     }
 
@@ -33,16 +36,21 @@ namespace sdk {
         do {
             vTaskDelay(1);
             vTaskGetInfo(m_taskHandle, &task_status, pdFALSE, eInvalid);
-        } while (task_status.eCurrentState == eDeleted);
+        } while (task_status.eCurrentState != eDeleted);
 
         stopAll();
+
+        if (const auto err = esp_unregister_shutdown_handler(shutdownHandler); err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to unregister shutdown handler: %s", esp_err_to_name(err));
+        }
     }
 
     void Manager::stopAll() {
         for (auto& entry: m_components) {
             // entry.first is a bool that describes whether the component is active
-            bool&      componentActive = entry.first;
-            Component& component       = entry.second;
+            const bool& componentActive = entry.first;
+            Component&  component       = entry.second;
+            ESP_LOGI(TAG, "Attempting to stop component %s", component.getTag().c_str());
 
             // If component is not active, don't attempt to stop it
             if (!componentActive) {
@@ -105,9 +113,9 @@ namespace sdk {
     }
 
     bool Manager::initComponent(componentEntry& entry) {
-        auto& component = entry.second.get();
+        auto& component        = entry.second.get();
         bool& componentRunning = entry.first;
-        auto  status       = component.initialize();
+        auto  status           = component.initialize();
         if (status == Component::Status::RUNNING) {
             ESP_LOGI(TAG, "Initialized component: %s", component.getTag().c_str());
             return componentRunning = true;
@@ -137,6 +145,11 @@ namespace sdk {
         }
 
         entry.first = true;
+    }
+
+    void Manager::shutdownHandler() {
+        ESP_LOGI(TAG, "Attempting to gracefully shutdown components before device shutdown/restart");
+        stop();
     }
 
 

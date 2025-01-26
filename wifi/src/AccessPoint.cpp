@@ -142,13 +142,17 @@ namespace sdk::wifi {
         }
     }
 
-    void AccessPoint::setConfig(const nlohmann::json& config) {
-        Config newConfig(config);
+    void AccessPoint::setConfig(const nlohmann::json& config, const bool saveConfig) {
+        const Config newConfig(config);
         if (newConfig == m_config) {
             ESP_LOGD(TAG, "Incoming config is the same, returning");
             return;
         }
         m_config = newConfig;
+        if (saveConfig) {
+            const auto ret = m_config.save();
+            assert(!ret && "Failed to save config");
+        }
         //All config changes require a restart of the component
         m_restartType = RestartType::COMPONENT;
     }
