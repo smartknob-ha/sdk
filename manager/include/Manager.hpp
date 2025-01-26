@@ -55,6 +55,11 @@ namespace sdk {
          */
         static std::expected<bool, esp_err_t> isComponentInitialized(const char* tag);
 
+        /**
+         * @brief   Handler for rebooting the device. Attempts to gracefully stop all components before shutdown/reboot
+         */
+        static void shutdownHandler();
+
     private:
         static constexpr inline char TAG[] = "Manager";
 
