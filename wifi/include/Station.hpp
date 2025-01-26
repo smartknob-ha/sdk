@@ -118,7 +118,7 @@ namespace sdk::wifi {
         etl::vector<WifiRecord, CONFIG_AP_SCAN_NUMBER> scan();
 
         esp_netif_t* const getNetif() { return m_networkInterface; };
-        void               setConfig(const nlohmann::json& config);
+        void               setConfig(const nlohmann::json& config, bool saveConfig = true);
 
         /**
          * @brief Retrieves current assigned IP address
