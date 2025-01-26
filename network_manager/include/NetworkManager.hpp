@@ -13,8 +13,8 @@ namespace sdk {
 
     class NetworkManager : public Component {
     public:
-        class Config final : public ConfigObject<3, 512, "Network Manager"> {
-            using Base = ConfigObject<3, 512, "Network Manager">;
+        class Config final : public ConfigObject<8, 512, "Network Manager"> {
+            using Base = ConfigObject;
 
         public:
             sdk::ConfigField<etl::string<15>> ipv4Address{CONFIG_DEFAULT_IP4_ADDRESS, "address_v4", sdk::RestartType::NONE};

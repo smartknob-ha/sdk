@@ -54,6 +54,14 @@ namespace sdk {
         if (state) {
             auto ret = m_station.initialize();
             if (ret == Status::RUNNING) {
+                if (const auto stationState = m_station.connect(); stationState == wifi::Station::STATUS::TIMED_OUT) {
+                    ESP_LOGE(TAG, "Timed out connecting to WiFi");
+                    return Status::ERROR;
+                }
+                else if (stationState != wifi::Station::STATUS::CONNECTED) {
+                    ESP_LOGE(TAG, "Error connecting to WiFi");
+                    return Status::ERROR;
+                }
                 return setIpMode(m_config.dhcpEnable);
             }
             return ret;
