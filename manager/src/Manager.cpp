@@ -18,7 +18,7 @@ namespace sdk {
     void Manager::start() {
         if (!m_running) {
             m_running = true;
-            auto res = xTaskCreate(Manager::run, "manager", CONFIG_RUN_TASK_STACK_SIZE, nullptr, 1, &m_taskHandle);
+            auto res  = xTaskCreate(Manager::run, "manager", CONFIG_RUN_TASK_STACK_SIZE, nullptr, 1, &m_taskHandle);
             if (res != pdPASS) {
                 ESP_LOGE(TAG, "Failed to create manager thread, error code: %d", res);
             }
@@ -48,8 +48,8 @@ namespace sdk {
     void Manager::stopAll() {
         for (auto& entry: m_components) {
             // entry.first is a bool that describes whether the component is active
-            bool& componentActive = entry.first;
-            Component& component       = entry.second;
+            const bool& componentActive = entry.first;
+            Component&  component       = entry.second;
             ESP_LOGI(TAG, "Attempting to stop component %s", component.getTag().c_str());
 
             // If component is not active, don't attempt to stop it
@@ -113,9 +113,9 @@ namespace sdk {
     }
 
     bool Manager::initComponent(componentEntry& entry) {
-        auto& component = entry.second.get();
+        auto& component        = entry.second.get();
         bool& componentRunning = entry.first;
-        auto  status       = component.initialize();
+        auto  status           = component.initialize();
         if (status == Component::Status::RUNNING) {
             ESP_LOGI(TAG, "Initialized component: %s", component.getTag().c_str());
             return componentRunning = true;
