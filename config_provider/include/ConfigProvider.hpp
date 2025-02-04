@@ -7,7 +7,6 @@
 
 #include <any>
 #include <cstring>
-#include <typeindex>
 
 #include "esp_app_desc.h"
 #include "esp_err.h"
@@ -296,15 +295,12 @@ namespace sdk {
 
         const RestartType m_restartType{RestartType::NONE};
 
-        const std::type_index m_type{std::type_identity<T>()};
-
         const T m_value;
 
     public:
         ConfigField(T defaultValue, const ConfigKey key, RestartType restartType = RestartType::NONE)
             : m_key(key),
               m_restartType(restartType),
-              m_type(typeid(T)),
               m_value(defaultValue){};
 
         /**
@@ -339,10 +335,6 @@ namespace sdk {
 
         [[nodiscard]] ConfigKey key() const {
             return m_key;
-        }
-
-        [[nodiscard]] std::type_index type() const {
-            return m_type;
         }
 
         operator T() const {
